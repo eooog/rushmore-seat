@@ -29,7 +29,7 @@ class AssetEventPublisher(
         val event = AssetChangedBatchEvent(
             eventId = state.eventId,
             tileId = state.tileId,
-            tileVersion = state.version,
+            tileVersion = state.tileVersion,
             changes = listOf(
                 AssetChangeDto(
                     assetId = state.assetId,
