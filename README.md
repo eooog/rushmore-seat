@@ -155,6 +155,47 @@ flowchart TD
     Reaper --> EventPublisher
 ```
 
+### 5.1 Deployment / Scaling Strategy
+
+100만 부하는 모든 요청을 예약 처리까지 통과시키는 것이 아니라, 대기열에서 흡수하고 실제 write path 유입량을 제한하는 방식으로 처리한다.
+
+```text
+1,000,000 queue enter attempts
+  -> Redis waiting queue
+  -> admission control
+  -> 5,000 ~ 20,000 admitted users
+  -> 1,000 ~ 5,000 WebSocket clients
+  -> 50,000 ~ 200,000 hold attempts
+  -> 300 ~ 500 rps PostgreSQL conditional update
+```
+
+초기 배포와 목표 부하 배포는 구분한다.
+
+| Stage | Deployment | Purpose |
+|---|---|---|
+| Initial | app x 1, Redis x 1, PostgreSQL x 1 | 기능 검증 |
+| Target Load | app x 3~4, Redis primary x 1, PostgreSQL primary x 1 | 100만 queue enter / WS fanout 검증 |
+| Optional HA | Redis primary + replica/Sentinel, PostgreSQL primary + read replica | 장애 대응 / 조회 분리 |
+
+Replica 판단:
+
+- API / WebSocket 서버 replica는 필요하다. HTTP 요청 처리, WebSocket 연결 유지, tile fanout을 수평 확장하기 위함이다.
+- PostgreSQL read replica는 핵심 예약 처리 성능에는 직접 도움이 되지 않는다. `AVAILABLE -> HELD` 전이는 primary write이기 때문이다.
+- Redis replica는 write scale-out 수단이 아니라 HA 또는 read offload 용도다.
+- WebSocket 서버를 여러 대로 늘리면 Redis Pub/Sub 기반 backplane을 사용해 asset state event를 모든 app replica에 전달한다.
+
+```text
+Load Balancer
+  ├─ app-1: HTTP API + WebSocket
+  ├─ app-2: HTTP API + WebSocket
+  ├─ app-3: HTTP API + WebSocket
+  └─ app-4: HTTP API + WebSocket
+
+Redis primary
+PostgreSQL primary
+Redis Pub/Sub backplane for WebSocket fanout
+```
+
 ---
 
 ## 6. User Flow
@@ -545,6 +586,8 @@ batch max payload: 32~64KB
 }
 ```
 
+느린 클라이언트의 outbound queue가 밀리면 오래된 개별 delta를 계속 쌓지 않고 `TILE_RESYNC_REQUIRED`를 전송한 뒤 snapshot 재조회로 복구한다.
+
 ---
 
 ## 12. Consistency Rules
@@ -784,6 +827,7 @@ Target 성공 기준:
 | Build | Gradle |
 | HTTP API | Spring MVC |
 | Realtime | Spring WebSocket |
+| WebSocket Backplane | Redis Pub/Sub |
 | Database | PostgreSQL |
 | DB Access | JPA, JdbcClient/JdbcTemplate for hot path SQL |
 | Migration | Flyway |
@@ -803,6 +847,8 @@ Target 성공 기준:
 이 프로젝트는 10만 좌석 규모의 대규모 예매 상황에서 Redis 대기열로 선택 화면 진입을 제어하고, WebSocket을 통해 사용자가 보고 있는 sector-tile의 좌석 상태만 실시간 동기화한다.
 
 좌석 클릭 시 Redis claim gate로 동시 클릭 UX를 완화하고, PostgreSQL 조건부 update로 `AVAILABLE -> HELD` 전이를 성공시킨 경우에만 좌석 선점을 인정한다.
+
+100만 queue enter 부하는 Redis 대기열에서 흡수하고, admission control을 통해 실제 WebSocket 연결과 PostgreSQL write path 유입량을 제한한다. 서버 확장은 API/WebSocket app replica를 우선하며, PostgreSQL replica는 핵심 예약 처리 성능이 아니라 조회/분석 분리 용도로만 고려한다.
 
 프론트엔드는 `Vite + Vanilla TypeScript + Canvas`로 구현하여 대량 좌석 상태 변경을 가볍게 렌더링한다.
 
