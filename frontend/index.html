@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rush Seat</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="panel">
+        <h1>Rush Seat</h1>
+        <div class="row">
+          <label>Event ID <input id="eventId" value="1" /></label>
+          <label>User ID <input id="userId" value="user-1" /></label>
+          <button id="queueEnter">Queue Enter</button>
+          <button id="queueMe">Queue Status</button>
+        </div>
+        <div class="row">
+          <label>Queue Token <input id="queueToken" /></label>
+          <label>Admission Token <input id="admissionToken" /></label>
+        </div>
+        <div class="row">
+          <label>Tile ID <input id="tileId" value="T-0001" /></label>
+          <button id="loadTile">Load Tile</button>
+          <button id="connectWs">Connect WS</button>
+        </div>
+        <pre id="log"></pre>
+      </section>
+      <section class="seatmap">
+        <canvas id="seatCanvas" width="1000" height="600"></canvas>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
