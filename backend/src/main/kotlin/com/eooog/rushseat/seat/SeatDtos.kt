@@ -36,6 +36,7 @@ data class AssetState(
     val assetId: Long,
     val eventId: Long,
     val tileId: String,
+    val tileVersion: Long,
     val status: String,
     val version: Long,
     val holdExpiresAt: OffsetDateTime?,
