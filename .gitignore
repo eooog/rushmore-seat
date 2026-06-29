@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin / JVM
+out/
+*.class
+
+# Node / Vite
+node_modules/
+dist/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+!.env.example
