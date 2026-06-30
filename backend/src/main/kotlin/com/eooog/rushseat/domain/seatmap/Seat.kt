@@ -20,7 +20,7 @@ import org.hibernate.annotations.Check
         )
     ]
 )
-@Check(constraints = "row_no > 0 and column_no > 0")
+@Check(constraints = "row_no > 0 and col_no > 0")
 class Seat protected constructor() : AuditableEntity() {
 
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -46,33 +46,33 @@ class Seat protected constructor() : AuditableEntity() {
     var rowLabel: String? = null
         protected set
 
-    @field:Column(name = "seat_no", length = 50)
-    var seatNo: String? = null
+    @field:Column(name = "col_label", length = 50)
+    var colLabel: String? = null
         protected set
 
     @field:Column(name = "row_no", nullable = false)
     var rowNo: Int = 0
         protected set
 
-    @field:Column(name = "column_no", nullable = false)
-    var columnNo: Int = 0
+    @field:Column(name = "col_no", nullable = false)
+    var colNo: Int = 0
         protected set
 
-    fun moveTo(rowNo: Int, columnNo: Int) {
+    fun moveTo(rowNo: Int, colNo: Int) {
         val validatedRowNo = validateNo("rowNo", rowNo)
-        val validatedColumnNo = validateNo("columnNo", columnNo)
+        val validatedColNo = validateNo("colNo", colNo)
 
-        check(tile.contains(validatedRowNo, validatedColumnNo)) {
+        check(tile.containsPosition(validatedRowNo, validatedColNo)) {
             "좌석 위치는 타일 범위 안에 있어야 합니다"
         }
 
         this.rowNo = validatedRowNo
-        this.columnNo = validatedColumnNo
+        this.colNo = validatedColNo
     }
 
-    fun changeDisplayLabel(rowLabel: String?, seatNo: String?) {
+    fun changeDisplayLabel(rowLabel: String?, colLabel: String?) {
         this.rowLabel = normalizeNullableText("좌석 행", rowLabel, 50)
-        this.seatNo = normalizeNullableText("좌석 번호", seatNo, 50)
+        this.colLabel = normalizeNullableText("좌석 열", colLabel, 50)
     }
 
     companion object {
@@ -82,9 +82,9 @@ class Seat protected constructor() : AuditableEntity() {
             tile: Tile,
             code: String,
             rowLabel: String? = null,
-            seatNo: String? = null,
+            colLabel: String? = null,
             rowNo: Int,
-            columnNo: Int,
+            colNo: Int,
         ): Seat {
             require(sector.seatMap == seatMap) {
                 "좌석의 구역은 동일한 좌석 배치에 속해야 합니다"
@@ -99,9 +99,9 @@ class Seat protected constructor() : AuditableEntity() {
             }
 
             val validatedRowNo = validateNo("rowNo", rowNo)
-            val validatedColumnNo = validateNo("columnNo", columnNo)
+            val validatedColNo = validateNo("colNo", colNo)
 
-            require(tile.contains(validatedRowNo, validatedColumnNo)) {
+            require(tile.containsPosition(validatedRowNo, validatedColNo)) {
                 "좌석 위치는 타일 범위 안에 있어야 합니다"
             }
 
@@ -111,9 +111,9 @@ class Seat protected constructor() : AuditableEntity() {
                 this.tile = tile
                 this.code = validateCode(code)
                 this.rowLabel = normalizeNullableText("좌석 행", rowLabel, 50)
-                this.seatNo = normalizeNullableText("좌석 번호", seatNo, 50)
+                this.colLabel = normalizeNullableText("좌석 열", colLabel, 50)
                 this.rowNo = validatedRowNo
-                this.columnNo = validatedColumnNo
+                this.colNo = validatedColNo
             }
         }
 
