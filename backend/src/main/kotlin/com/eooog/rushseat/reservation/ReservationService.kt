@@ -22,8 +22,8 @@ class ReservationService(
     private val queueService: QueueService,
     private val seatService: SeatService,
     private val assetEventPublisher: AssetEventPublisher,
-    @Value("\${rush-seat.hold.ttl-seconds}") private val holdTtlSeconds: Long,
-    @Value("\${rush-seat.hold.claim-ttl-millis}") private val claimTtlMillis: Long,
+    @Value("\${rushmore-seat.hold.ttl-seconds}") private val holdTtlSeconds: Long,
+    @Value("\${rushmore-seat.hold.claim-ttl-millis}") private val claimTtlMillis: Long,
 ) {
     @Transactional
     fun hold(eventId: Long, assetId: Long, authorization: String?, idempotencyKey: String?, request: HoldRequest): HoldResponse {
@@ -131,7 +131,7 @@ class ReservationService(
             """.trimIndent(),
         )
             .param("eventId", eventId)
-            .param("holdToken", holdToken)
+            .param("holdToken", requestHoldToken = holdToken)
             .param("userId", userId)
             .query(Long::class.java)
             .optional()
