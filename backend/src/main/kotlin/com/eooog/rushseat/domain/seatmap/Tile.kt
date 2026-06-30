@@ -20,7 +20,7 @@ import org.hibernate.annotations.Check
         )
     ]
 )
-@Check(constraints = "row_start_no > 0 and row_end_no >= row_start_no and column_start_no > 0 and column_end_no >= column_start_no and seat_count >= 0")
+@Check(constraints = "row_start_no > 0 and row_end_no >= row_start_no and col_start_no > 0 and col_end_no >= col_start_no and seat_count >= 0")
 class Tile protected constructor() : AuditableEntity() {
 
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -49,12 +49,12 @@ class Tile protected constructor() : AuditableEntity() {
     var rowEndNo: Int = 0
         protected set
 
-    @field:Column(name = "column_start_no", nullable = false)
-    var columnStartNo: Int = 0
+    @field:Column(name = "col_start_no", nullable = false)
+    var colStartNo: Int = 0
         protected set
 
-    @field:Column(name = "column_end_no", nullable = false)
-    var columnEndNo: Int = 0
+    @field:Column(name = "col_end_no", nullable = false)
+    var colEndNo: Int = 0
         protected set
 
     @field:Column(name = "seat_count", nullable = false)
@@ -65,16 +65,16 @@ class Tile protected constructor() : AuditableEntity() {
         this.name = validateName(name)
     }
 
-    fun changeRange(rowStartNo: Int, rowEndNo: Int, columnStartNo: Int, columnEndNo: Int) {
-        validateRange(rowStartNo, rowEndNo, columnStartNo, columnEndNo)
+    fun changeRange(rowStartNo: Int, rowEndNo: Int, colStartNo: Int, colEndNo: Int) {
+        validateRange(rowStartNo, rowEndNo, colStartNo, colEndNo)
         this.rowStartNo = rowStartNo
         this.rowEndNo = rowEndNo
-        this.columnStartNo = columnStartNo
-        this.columnEndNo = columnEndNo
+        this.colStartNo = colStartNo
+        this.colEndNo = colEndNo
     }
 
-    fun contains(rowNo: Int, columnNo: Int): Boolean {
-        return rowNo in rowStartNo..rowEndNo && columnNo in columnStartNo..columnEndNo
+    fun containsPosition(rowNo: Int, colNo: Int): Boolean {
+        return rowNo in rowStartNo..rowEndNo && colNo in colStartNo..colEndNo
     }
 
     fun changeSeatCount(seatCount: Int) {
@@ -93,15 +93,15 @@ class Tile protected constructor() : AuditableEntity() {
             name: String,
             rowStartNo: Int,
             rowEndNo: Int,
-            columnStartNo: Int,
-            columnEndNo: Int,
+            colStartNo: Int,
+            colEndNo: Int,
             seatCount: Int = 0,
         ): Tile {
             require(sector.seatMap == seatMap) {
                 "타일의 구역은 동일한 좌석 배치에 속해야 합니다"
             }
 
-            validateRange(rowStartNo, rowEndNo, columnStartNo, columnEndNo)
+            validateRange(rowStartNo, rowEndNo, colStartNo, colEndNo)
 
             return Tile().apply {
                 this.seatMap = seatMap
@@ -110,8 +110,8 @@ class Tile protected constructor() : AuditableEntity() {
                 this.name = validateName(name)
                 this.rowStartNo = rowStartNo
                 this.rowEndNo = rowEndNo
-                this.columnStartNo = columnStartNo
-                this.columnEndNo = columnEndNo
+                this.colStartNo = colStartNo
+                this.colEndNo = colEndNo
                 this.seatCount = validateSeatCount(seatCount)
             }
         }
@@ -130,11 +130,11 @@ class Tile protected constructor() : AuditableEntity() {
             return normalized
         }
 
-        private fun validateRange(rowStartNo: Int, rowEndNo: Int, columnStartNo: Int, columnEndNo: Int) {
+        private fun validateRange(rowStartNo: Int, rowEndNo: Int, colStartNo: Int, colEndNo: Int) {
             require(rowStartNo > 0) { "타일 시작 행 번호는 0보다 커야 합니다" }
             require(rowEndNo >= rowStartNo) { "타일 종료 행 번호는 시작 행 번호보다 작을 수 없습니다" }
-            require(columnStartNo > 0) { "타일 시작 열 번호는 0보다 커야 합니다" }
-            require(columnEndNo >= columnStartNo) { "타일 종료 열 번호는 시작 열 번호보다 작을 수 없습니다" }
+            require(colStartNo > 0) { "타일 시작 열 번호는 0보다 커야 합니다" }
+            require(colEndNo >= colStartNo) { "타일 종료 열 번호는 시작 열 번호보다 작을 수 없습니다" }
         }
 
         private fun validateSeatCount(seatCount: Int): Int {
