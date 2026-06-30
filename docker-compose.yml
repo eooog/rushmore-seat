@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: rush-seat-postgres
+    container_name: rushmore-seat-postgres
     environment:
       POSTGRES_DB: rushseat
       POSTGRES_USER: rushseat
@@ -18,7 +18,7 @@ services:
 
   redis:
     image: redis:7.2
-    container_name: rush-seat-redis
+    container_name: rushmore-seat-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
@@ -32,7 +32,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
-    container_name: rush-seat-prometheus
+    container_name: rushmore-seat-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -43,7 +43,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.3.0
-    container_name: rush-seat-grafana
+    container_name: rushmore-seat-grafana
     ports:
       - "3000:3000"
     environment:
