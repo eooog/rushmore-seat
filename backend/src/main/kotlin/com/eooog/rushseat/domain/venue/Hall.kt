@@ -1,5 +1,6 @@
 package com.eooog.rushseat.domain.venue
 
+import com.eooog.rushseat.domain.AuditableEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -11,7 +12,7 @@ import org.hibernate.annotations.Check
 @Entity
 @Table(name = "hall")
 @Check(constraints = "capacity > 0")
-class Hall {
+class Hall protected constructor() : AuditableEntity() {
 
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "venue_id", nullable = false)
