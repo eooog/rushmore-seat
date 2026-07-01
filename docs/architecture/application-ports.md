@@ -16,9 +16,8 @@ com.eooog.rushseat
 application/reservation
 ├─ provided
 ├─ required
-├─ command
-├─ result
-└─ service
+├─ ReservationModel.kt
+└─ ReservationService.kt
 ```
 
 ## Provided Port
@@ -37,14 +36,33 @@ Controller, scheduler, batch 등 inbound adapter는 provided port만 호출한�
 `required`는 application이 외부 기술에 요구하는 port다.
 
 ```text
-application.reservation.service
+application.reservation.ReservationService
   -> application.reservation.required.HoldPerformanceSeatPort
   -> adapter.out.persistence
 ```
 
 DB, Redis, WebSocket 구현은 required port를 구현한다.
 
-## Rule
+## Package Rule
+
+작은 use case 단위에서는 `command`, `result`, `service` 패키지를 별도로 만들지 않는다.
+
+```text
+ReservationModel.kt
+- use case command
+- use case result
+
+ReservationService.kt
+- use case implementation
+
+provided/ReservationUseCase.kt
+- inbound use case interface
+
+required/ReservationPort.kt
+- outbound port interface
+```
+
+## Port Rule
 
 Entity별 CRUD port를 기계적으로 만들지 않는다.
 
