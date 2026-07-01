@@ -57,6 +57,7 @@ Performer
 ```text
 PerformanceStatus
 - SCHEDULED
+- COMPLETED
 - CANCELLED
 
 PerformanceSalesStatus
@@ -64,6 +65,8 @@ PerformanceSalesStatus
 - ON_SALE
 - CLOSED
 ```
+
+`ends_at`은 예정 종료 시각일 뿐이다. 실제 공연 종료 여부는 운영적으로 `COMPLETED` 전이를 통해 확정한다.
 
 예매 가능 여부는 두 조건을 함께 본다.
 
