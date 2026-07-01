@@ -56,6 +56,11 @@ class Performance protected constructor() : AuditableEntity() {
     var status: PerformanceStatus = PerformanceStatus.SCHEDULED
         protected set
 
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "sales_status", nullable = false, length = 30)
+    var salesStatus: PerformanceSalesStatus = PerformanceSalesStatus.BEFORE_SALE
+        protected set
+
     fun reschedule(startsAt: Instant, endsAt: Instant) {
         assertNotCancelled()
         validatePerformanceTime(startsAt, endsAt)
@@ -71,17 +76,19 @@ class Performance protected constructor() : AuditableEntity() {
     }
 
     fun openSales() {
-        check(status == PerformanceStatus.SCHEDULED) {
-            "예매 예정 상태의 공연 회차만 판매를 시작할 수 있습니다"
+        assertNotCancelled()
+        check(salesStatus == PerformanceSalesStatus.BEFORE_SALE) {
+            "예매 시작 전 상태의 공연 회차만 판매를 시작할 수 있습니다"
         }
-        this.status = PerformanceStatus.ON_SALE
+        this.salesStatus = PerformanceSalesStatus.ON_SALE
     }
 
     fun closeSales() {
-        check(status == PerformanceStatus.ON_SALE) {
+        assertNotCancelled()
+        check(salesStatus == PerformanceSalesStatus.ON_SALE) {
             "판매 중인 공연 회차만 판매를 종료할 수 있습니다"
         }
-        this.status = PerformanceStatus.SALES_CLOSED
+        this.salesStatus = PerformanceSalesStatus.CLOSED
     }
 
     fun cancel() {
@@ -89,10 +96,11 @@ class Performance protected constructor() : AuditableEntity() {
             "이미 취소된 공연 회차입니다"
         }
         this.status = PerformanceStatus.CANCELLED
+        this.salesStatus = PerformanceSalesStatus.CLOSED
     }
 
     fun assertOnSale() {
-        check(status == PerformanceStatus.ON_SALE) {
+        check(status == PerformanceStatus.SCHEDULED && salesStatus == PerformanceSalesStatus.ON_SALE) {
             "판매 중인 공연 회차가 아닙니다"
         }
     }
@@ -113,6 +121,7 @@ class Performance protected constructor() : AuditableEntity() {
             salesOpenAt: Instant,
             salesCloseAt: Instant,
             status: PerformanceStatus = PerformanceStatus.SCHEDULED,
+            salesStatus: PerformanceSalesStatus = PerformanceSalesStatus.BEFORE_SALE,
         ): Performance {
             require(seatMap.hall == hall) {
                 "공연 회차의 좌석 배치도는 동일한 홀에 속해야 합니다"
@@ -130,6 +139,7 @@ class Performance protected constructor() : AuditableEntity() {
                 this.salesOpenAt = salesOpenAt
                 this.salesCloseAt = salesCloseAt
                 this.status = status
+                this.salesStatus = salesStatus
             }
         }
 
