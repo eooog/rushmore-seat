@@ -14,9 +14,9 @@ abstract class BaseEntity {
     @field:GeneratedValue(strategy = GenerationType.IDENTITY)
     @field:Column(name = "id", nullable = false, updatable = false)
     var id: Long? = null
+        protected set
 
     override fun equals(other: Any?): Boolean {
-
         if (this === other) return true
         if (other === null) return false
 
@@ -38,5 +38,4 @@ abstract class BaseEntity {
             target.javaClass
         }
     }
-
 }
