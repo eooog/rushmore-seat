@@ -141,6 +141,10 @@ class ReservationService(
             )
         )
 
+        check(reservationResult.reservationId != null) {
+            "Reservation record was not confirmed after seat confirmation"
+        }
+
         publishSeatChangePort.publishSeatReserved(
             SeatReservedEvent(
                 performanceId = command.performanceId,
