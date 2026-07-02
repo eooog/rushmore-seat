@@ -20,25 +20,44 @@ application/reservation
 └─ ReservationService.kt
 ```
 
-`adapter`는 `inbound`와 `outbound`로 구분한다.
+`adapter`는 `inbound`와 `outbound`로 구분하고, 그 다음에 기능/도메인, 마지막에 기술을 둔다.
 
 ```text
 adapter
 ├─ inbound
-│  └─ web
+│  ├─ queue
+│  │  └─ web
+│  └─ reservation
+│     └─ web
 └─ outbound
-   ├─ persistence
-   └─ websocket
+   ├─ queue
+   │  └─ redis
+   ├─ performance
+   │  └─ persistence
+   ├─ reservation
+   │  └─ persistence
+   └─ realtime
+      └─ websocket
 ```
 
 Kotlin에서 `in`은 keyword라서 package 이름은 `in` / `out` 대신 `inbound` / `outbound`를 사용한다.
+
+기술 이름이 도메인보다 앞서지 않게 한다.
+
+```text
+adapter/outbound/queue/redis        O
+adapter/outbound/redis/queue        X
+
+adapter/outbound/realtime/websocket O
+adapter/outbound/websocket/realtime X
+```
 
 ## Provided Port
 
 `provided`는 application이 외부에 제공하는 use case다.
 
 ```text
-adapter.inbound.web
+adapter.inbound.reservation.web
   -> application.reservation.provided.HoldSeatUseCase
 ```
 
@@ -51,7 +70,7 @@ Controller, scheduler, batch 등 inbound adapter는 provided port만 호출한�
 ```text
 application.reservation.ReservationService
   -> application.reservation.required.HoldPerformanceSeatPort
-  -> adapter.outbound.persistence
+  -> adapter.outbound.performance.persistence
 ```
 
 DB, Redis, WebSocket 구현은 required port를 구현한다.
