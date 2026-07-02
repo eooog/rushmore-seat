@@ -10,11 +10,13 @@ import com.eooog.rushseat.application.reservation.required.HoldPerformanceSeatCo
 import com.eooog.rushseat.application.reservation.required.HoldPerformanceSeatPort
 import com.eooog.rushseat.application.reservation.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationPort
+import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesCommand
+import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesPort
 import com.eooog.rushseat.application.reservation.required.PublishSeatChangePort
-import com.eooog.rushseat.application.reservation.required.SaveHeldReservationCommand
 import com.eooog.rushseat.application.reservation.required.SaveReservationPort
 import com.eooog.rushseat.application.reservation.required.SeatHeldEvent
 import com.eooog.rushseat.application.reservation.required.SeatReservedEvent
+import com.eooog.rushseat.domain.reservation.Reservation
 import com.eooog.rushseat.domain.reservation.ReservationStatus
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -26,6 +28,7 @@ import java.util.UUID
 class ReservationService(
     private val loadPerformanceSalesStatusPort: LoadPerformanceSalesStatusPort,
     private val loadReservationPort: LoadReservationPort,
+    private val loadReservationReferencesPort: LoadReservationReferencesPort,
     private val holdPerformanceSeatPort: HoldPerformanceSeatPort,
     private val saveReservationPort: SaveReservationPort,
     private val confirmPerformanceSeatPort: ConfirmPerformanceSeatPort,
@@ -87,16 +90,24 @@ class ReservationService(
             )
         }
 
-        val savedReservation = saveReservationPort.saveHeld(
-            SaveHeldReservationCommand(
+        val references = loadReservationReferencesPort.load(
+            LoadReservationReferencesCommand(
                 performanceId = command.performanceId,
                 performanceSeatId = command.performanceSeatId,
                 memberId = command.memberId,
-                holdToken = holdToken,
-                idempotencyKey = command.idempotencyKey,
-                expiresAt = expiresAt,
             )
+        ) ?: error("Reservation references were not found after seat hold")
+
+        val reservation = Reservation.createHeld(
+            performance = references.performance,
+            performanceSeat = references.performanceSeat,
+            member = references.member,
+            holdToken = holdToken,
+            idempotencyKey = command.idempotencyKey,
+            expiresAt = expiresAt,
         )
+
+        val savedReservation = saveReservationPort.save(reservation)
 
         publishSeatChangePort.publishSeatHeld(
             SeatHeldEvent(
