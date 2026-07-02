@@ -6,9 +6,11 @@ import com.eooog.rushseat.application.reservation.required.ConfirmReservationRec
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordResult
 import com.eooog.rushseat.application.reservation.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationPort
+import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesCommand
+import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesPort
 import com.eooog.rushseat.application.reservation.required.PerformanceSalesStatusSnapshot
+import com.eooog.rushseat.application.reservation.required.ReservationReferences
 import com.eooog.rushseat.application.reservation.required.ReservationSnapshot
-import com.eooog.rushseat.application.reservation.required.SaveHeldReservationCommand
 import com.eooog.rushseat.application.reservation.required.SaveReservationPort
 import com.eooog.rushseat.application.reservation.required.SavedReservationResult
 import com.eooog.rushseat.domain.member.Member
@@ -25,6 +27,7 @@ class ReservationJpaAdapter(
     private val entityManager: EntityManager,
 ) : LoadPerformanceSalesStatusPort,
     LoadReservationPort,
+    LoadReservationReferencesPort,
     SaveReservationPort,
     ConfirmReservationPort {
 
@@ -63,21 +66,22 @@ class ReservationJpaAdapter(
         )?.toSnapshot()
     }
 
-    override fun saveHeld(command: SaveHeldReservationCommand): SavedReservationResult {
-        val performance = entityManager.getReference(Performance::class.java, command.performanceId)
+    override fun load(command: LoadReservationReferencesCommand): ReservationReferences? {
+        val performance = entityManager.find(Performance::class.java, command.performanceId)
+            ?: return null
         val performanceSeat = entityManager.find(PerformanceSeat::class.java, command.performanceSeatId)
-            ?: error("Performance seat not found: ${command.performanceSeatId}")
-        val member = entityManager.getReference(Member::class.java, command.memberId)
+            ?: return null
+        val member = entityManager.find(Member::class.java, command.memberId)
+            ?: return null
 
-        val reservation = Reservation.createHeld(
+        return ReservationReferences(
             performance = performance,
             performanceSeat = performanceSeat,
             member = member,
-            holdToken = command.holdToken,
-            idempotencyKey = command.idempotencyKey,
-            expiresAt = command.expiresAt,
         )
+    }
 
+    override fun save(reservation: Reservation): SavedReservationResult {
         val savedReservation = reservationRepository.saveAndFlush(reservation)
         return SavedReservationResult(
             reservationId = savedReservation.id ?: error("Reservation id was not generated"),
