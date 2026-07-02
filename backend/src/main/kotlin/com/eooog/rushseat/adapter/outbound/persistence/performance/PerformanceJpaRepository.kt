@@ -1,4 +1,4 @@
-package com.eooog.rushseat.adapter.outbound.performance.persistence
+package com.eooog.rushseat.adapter.outbound.persistence.performance
 
 import com.eooog.rushseat.domain.performance.Performance
 import com.eooog.rushseat.domain.performance.PerformanceSalesStatus

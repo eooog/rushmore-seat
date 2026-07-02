@@ -1,6 +1,6 @@
 package com.eooog.rushseat.adapter.outbound.reservation.persistence
 
-import com.eooog.rushseat.adapter.outbound.performance.persistence.PerformanceJpaRepository
+import com.eooog.rushseat.adapter.outbound.persistence.performance.PerformanceJpaRepository
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationPort
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordCommand
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordResult
