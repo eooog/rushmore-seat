@@ -1,8 +1,12 @@
 package com.eooog.rushseat.application.reservation.required
 
+import com.eooog.rushseat.domain.member.Member
+import com.eooog.rushseat.domain.performance.Performance
 import com.eooog.rushseat.domain.performance.PerformanceSalesStatus
+import com.eooog.rushseat.domain.performance.PerformanceSeat
 import com.eooog.rushseat.domain.performance.PerformanceSeatStatus
 import com.eooog.rushseat.domain.performance.PerformanceStatus
+import com.eooog.rushseat.domain.reservation.Reservation
 import com.eooog.rushseat.domain.reservation.ReservationStatus
 import java.time.Instant
 
@@ -44,6 +48,22 @@ data class ReservationSnapshot(
     val expiresAt: Instant?,
 )
 
+interface LoadReservationReferencesPort {
+    fun load(command: LoadReservationReferencesCommand): ReservationReferences?
+}
+
+data class LoadReservationReferencesCommand(
+    val performanceId: Long,
+    val performanceSeatId: Long,
+    val memberId: Long,
+)
+
+data class ReservationReferences(
+    val performance: Performance,
+    val performanceSeat: PerformanceSeat,
+    val member: Member,
+)
+
 interface HoldPerformanceSeatPort {
     fun hold(command: HoldPerformanceSeatCommand): HoldPerformanceSeatResult
 }
@@ -63,17 +83,8 @@ data class HoldPerformanceSeatResult(
 )
 
 interface SaveReservationPort {
-    fun saveHeld(command: SaveHeldReservationCommand): SavedReservationResult
+    fun save(reservation: Reservation): SavedReservationResult
 }
-
-data class SaveHeldReservationCommand(
-    val performanceId: Long,
-    val performanceSeatId: Long,
-    val memberId: Long,
-    val holdToken: String,
-    val idempotencyKey: String,
-    val expiresAt: Instant,
-)
 
 data class SavedReservationResult(
     val reservationId: Long,
