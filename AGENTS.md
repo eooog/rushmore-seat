@@ -4,7 +4,7 @@
 
 This file applies to the entire `rushmore-seat` repository.
 
-`rushmore-seat` is a large-scale seat reservation system simulation. It is not a basic reservation CRUD project. Preserve these goals:
+`rushmore-seat` is a large-scale seat reservation system simulation, not a basic reservation CRUD project. Preserve these goals:
 
 - Queue-based traffic admission before seat selection.
 - Admission token validation before seat snapshot, WebSocket subscription, hold, or confirm paths.
@@ -15,74 +15,39 @@ This file applies to the entire `rushmore-seat` repository.
 - Oversell prevention.
 - Load-testable behavior with measurable performance criteria.
 
-Treat `README.md` and this file as the repository architecture contract unless the task explicitly asks to change the architecture.
-
----
-
-## Repository Shape
-
-```text
-rushmore-seat
-├── backend/          # Kotlin + Spring Boot backend
-├── frontend/         # Vite + Vanilla TypeScript + Canvas frontend
-├── docker-compose.yml
-├── build.gradle.kts
-├── settings.gradle.kts
-└── README.md
-```
-
-Backend stack:
-
-- Kotlin
-- Java 21
-- Spring Boot
-- Spring MVC
-- Spring WebSocket
-- Spring Data JPA
-- Redis
-- PostgreSQL
-- Flyway
-- Actuator / Micrometer / Prometheus
-- JUnit 5
-- Testcontainers
-
-Frontend stack:
-
-- Vite
-- Vanilla TypeScript
-- HTML / CSS
-- Canvas-based seat map rendering
-
-Runtime dependencies:
-
-- PostgreSQL
-- Redis
-- Prometheus
-- Grafana
+Treat `README.md` and this file as the architecture contract unless the task explicitly asks to change the architecture.
 
 ---
 
 ## Codex CLI Workflow Rules
 
-This repository uses Codex CLI command modes as the primary AI workflow interface.
+Use Codex CLI command modes as the primary AI workflow interface.
 
 Command semantics:
 
-- `/new`: starts a fresh conversation in the same CLI session.
-- `/plan`: switches the active conversation into planning mode and creates an implementation plan.
-- `/review`: reviews the current working tree.
-- `/diff`: inspects local changes.
-- `/resume`: reloads a saved conversation from the session picker.
-- `/agent`: switches to an existing agent thread from the picker.
+- `/new`: start a fresh conversation in the same CLI session.
+- `/plan`: enter planning mode in the active conversation.
+- `/review`: review the current working tree.
+- `/diff`: inspect local changes.
+- `/resume`: re-enter a saved conversation.
+- `/agent`: switch to an existing agent thread.
 
 Role assignment is conversation-based:
 
-- Planner conversation: `/new`, then `/plan`.
-- Implementer conversation: `/new`, then approved plan plus explicit implementation approval.
-- Reviewer conversation: `/new`, then `/review`.
-- Fixer conversation: `/new`, then selected reviewer findings only.
+- Planner: `/new`, then `/plan`.
+- Implementer: `/new`, then approved plan plus explicit implementation approval.
+- Reviewer: `/new`, then `/review` or read-only review agents.
+- Fixer: `/new`, then selected reviewer findings only.
 
-Do not combine Codex CLI command modes with duplicate prompt labels. In Codex CLI, `/plan` is the planning interface and `/review` is the review interface. Prompt labels such as `Plan only` or `Review only` are fallback patterns only for non-CLI environments.
+Do not combine CLI commands with duplicate prompt labels. In Codex CLI, `/plan` is the planning interface and `/review` is the review interface. `Plan only` and `Review only` are fallback phrases only for non-CLI environments.
+
+### Multi-Agent Policy
+
+Detailed workflow is in `docs/AI_AGENT_WORKFLOW.md`.
+
+Use multiple agents only for read-only research and review. Useful review lanes are architecture, concurrency, tests, persistence boundaries, naming, and scope control.
+
+Implementation and fixing must use one writer conversation. Review agents must return findings only. A human selects which findings move to the fixer conversation.
 
 ### Standard Flow
 
@@ -93,12 +58,24 @@ Planner:
 /plan <task and planning requirements>
 ```
 
+Plan review for risky work:
+
+```text
+Review this plan with read-only agents.
+Check architecture, concurrency, tests, persistence boundaries, naming, and unnecessary complexity.
+Return conflicts and required plan changes only.
+Do not edit files.
+```
+
 Implementer:
 
 ```text
 /new
 Approved plan:
 <paste planner output>
+
+Approved plan-review findings:
+<paste selected findings>
 
 Implement the approved plan.
 ```
@@ -124,25 +101,27 @@ Fix only the selected findings.
 
 Use `/resume` or `/agent` only when continuing the same role conversation.
 
-- Continue planner refinement: `/resume` or `/agent` to the planner conversation.
-- Continue implementation after interruption: `/resume` or `/agent` to the implementer conversation.
-- Continue review discussion: `/resume` or `/agent` to the reviewer conversation.
+- Continue planner refinement: re-enter the planner conversation.
+- Continue implementation after interruption: re-enter the implementer conversation.
+- Continue review discussion: re-enter the reviewer conversation.
+- Continue selected fix: re-enter the fixer conversation.
 - Switch roles: start a fresh conversation with `/new`.
 
-Never turn a planner conversation into an implementer conversation. Never turn an implementer conversation into a reviewer conversation.
+Do not turn a planner conversation into an implementer conversation. Do not turn an implementer conversation into a reviewer conversation.
 
 ### AI Workflow Acceptance Criteria
 
 A workflow run is acceptable when:
 
 - Planning used `/new` followed by `/plan`.
-- Implementation used a separate conversation and explicit approval.
-- Review used `/new` followed by `/review`.
-- Fixes used a separate scoped conversation.
-- Hook logs captured planner, implementer, reviewer, and fixer turns when hooks are enabled.
+- Risky plans were reviewed by read-only agents.
+- Implementation used a separate single-writer conversation and explicit approval.
+- Review used `/new` followed by `/review` or read-only review agents.
+- Fixes used a separate scoped single-writer conversation.
 - Relevant tests were added or updated.
 - Verification was run or explicitly reported as not run.
 - `/diff` showed no unrelated file changes.
+- Hook logs captured role conversations when hooks are enabled.
 
 ---
 
@@ -173,7 +152,7 @@ Rules:
 - `PerformanceSeat` represents the state of a seat for one performance.
 - Reservation state must be derived from `PerformanceSeat` / `Reservation`, not from the static `Seat`.
 - `Performance` identity must not depend on `starts_at`, `ends_at`, or `hall_id`.
-- Do not add time-overlap constraints casually. If needed, implement explicit service validation or a PostgreSQL exclusion constraint after design review.
+- Do not add time-overlap constraints casually. If needed, implement explicit service validation or PostgreSQL exclusion constraint after design review.
 
 ### 2. Keep Performance Status and Sales Status Separate
 
@@ -207,7 +186,7 @@ Queue passed = seat selection screen admission
 Queue passed != seat reserved
 ```
 
-The queue absorbs large traffic. Only admitted users may reach seat selection, WebSocket subscription, hold, or confirm paths.
+Only admitted users may reach seat selection, WebSocket subscription, hold, or confirm paths.
 
 ### 4. Do Not Broadcast All Seat Changes to All Clients
 
@@ -261,13 +240,6 @@ WHERE id = :performanceSeatId
   AND status = 'AVAILABLE';
 ```
 
-Interpretation:
-
-```text
-affected rows = 1 -> hold success
-affected rows = 0 -> already held, reserved, expired, invalid, or unavailable
-```
-
 Rules:
 
 - Do not replace the hot hold path with read-before-write logic.
@@ -277,20 +249,13 @@ Rules:
 
 ### 7. Keep Redis Roles Explicit
 
-Redis may be used for:
-
-- Waiting queue.
-- Admission token / queue token state.
-- Seat read model.
-- WebSocket Pub/Sub backplane.
-- Optional claim gate.
+Redis may be used for waiting queue, admission token state, seat read model, WebSocket backplane, and optional claim gate.
 
 Rules:
 
 - Redis queue admission must not become the source of truth for final reservation.
 - PostgreSQL remains the source of truth for final seat state.
 - Redis claim gate, if added, is an optimization before the DB hold path, not a replacement for DB correctness.
-- Redis replica is not a write scale-out mechanism for reservation correctness.
 
 ### 8. Expired Hold Recovery Is Mandatory
 
@@ -314,8 +279,6 @@ Rules:
 
 ## Naming Rules
 
-New code should move toward the target domain language.
-
 Prefer:
 
 ```text
@@ -338,13 +301,9 @@ event
 asset
 ```
 
-Do not perform broad package renames unless explicitly requested.
-
 ---
 
-## Backend Coding Rules
-
-### Kotlin / Spring
+## Backend Rules
 
 - Use Kotlin idioms, but keep code explicit and readable.
 - Use constructor injection.
@@ -353,8 +312,6 @@ Do not perform broad package renames unless explicitly requested.
 - Keep domain state transitions centralized in service/domain logic.
 - Do not introduce new global mutable state.
 - Do not add broad dependencies without a clear need.
-
-### Persistence
 
 Use JPA where aggregate lifecycle and ordinary CRUD are acceptable.
 
@@ -365,15 +322,16 @@ Use `JdbcClient` / `JdbcTemplate` style SQL for hot-path operations where exact 
 - High-contention reservation paths.
 - Load-test-sensitive queries.
 
-Rules:
+Schema rules:
 
 - Entity/schema changes require Flyway migrations.
 - Do not rely on Hibernate DDL auto-generation.
 - Keep `ddl-auto=validate` compatible with migrations.
-- Do not make destructive migrations unless the task explicitly requires it.
 - Add indexes when introducing new query patterns.
 
-### API
+---
+
+## API Rules
 
 Target API shape:
 
@@ -395,33 +353,8 @@ Rules:
 
 - Keep admission validation before seat selection and WebSocket subscription.
 - Keep hold and confirm as separate operations.
-- Do not add API behavior that bypasses queue/admission unless it is explicitly marked as admin/test-only.
+- Do not add API behavior that bypasses queue/admission unless explicitly marked as admin/test-only.
 - Update README or API documentation when changing endpoint shape.
-
-### WebSocket
-
-Rules:
-
-- WebSocket subscriptions must be scoped by performance and tile.
-- Do not send full seat map updates for small changes.
-- Prefer snapshot + delta model.
-- Support resync when a client misses too many updates.
-- When multiple app replicas are involved, use Redis Pub/Sub or another explicit backplane.
-
----
-
-## Frontend Rules
-
-The frontend is a minimal Vite + TypeScript + Canvas client.
-
-Rules:
-
-- Keep frontend simple.
-- Do not introduce a heavy framework unless explicitly requested.
-- Keep seat rendering tile-oriented.
-- Do not assume the client has all 100,000 seats loaded.
-- Keep API URLs and WebSocket URLs easy to configure.
-- When changing frontend behavior, run the frontend build.
 
 ---
 
@@ -429,92 +362,19 @@ Rules:
 
 Every functional change must include relevant tests.
 
-Do not claim a feature is complete unless the relevant tests have been added or updated and the verification command has been run or explicitly reported as not run.
+Required coverage by change type:
 
-### Required Coverage by Change Type
+- Domain state changes: valid/invalid transitions, sales status rules, hold expiration, confirm behavior.
+- Queue/admission changes: queue enter, queue status, token creation, TTL, expired admission rejection, duplicate queue entry.
+- Seat hold changes: success, already held, already reserved, duplicate hold prevention, concurrent attempts, token ownership, expiration.
+- Reservation confirm changes: valid token, wrong token, expired hold, already reserved seat, oversell prevention.
+- Expired hold reaper changes: expired release, non-expired not released, reserved never released, repeat execution safety, release event.
+- WebSocket/tile changes: tile-scoped subscription, tile snapshot, delta routing, no cross-tile leakage, resync behavior.
+- Schema changes: Flyway validity, JPA validation, indexes, backward-compatible assumptions.
 
-#### Domain State Changes
+For DB-sensitive hold behavior, prefer PostgreSQL integration tests via Testcontainers.
 
-Add or update tests for:
-
-- Valid state transitions.
-- Invalid state transitions.
-- Performance status vs sales status rules.
-- Hold expiration behavior.
-- Reservation confirm behavior.
-
-#### Queue / Admission Changes
-
-Add or update tests for:
-
-- Queue enter.
-- Queue status.
-- Admission token creation.
-- Admission token TTL.
-- Rejection when admission is missing or expired.
-- Duplicate queue entry behavior.
-
-#### Seat Hold Changes
-
-Add or update tests for:
-
-- `AVAILABLE -> HELD` success.
-- Hold failure when already held.
-- Hold failure when already reserved.
-- Duplicate hold prevention.
-- Concurrent hold attempts on the same seat.
-- Hold token ownership.
-- Hold expiration.
-
-For DB-sensitive hold behavior, prefer integration tests with PostgreSQL via Testcontainers. Do not rely only on mocks for concurrency-sensitive correctness.
-
-#### Reservation Confirm Changes
-
-Add or update tests for:
-
-- Confirm success with valid hold token.
-- Confirm failure with wrong hold token.
-- Confirm failure after hold expiration.
-- Confirm failure for already reserved seat.
-- Oversell prevention.
-
-#### Expired Hold Reaper Changes
-
-Add or update tests for:
-
-- Expired `HELD` seats are released.
-- Non-expired `HELD` seats are not released.
-- `RESERVED` seats are never released.
-- Reaper can run repeatedly without corrupting state.
-- Release event is published after successful release.
-
-#### WebSocket / Tile Changes
-
-Add or update tests for:
-
-- Tile-scoped subscription.
-- Seat snapshot loading by tile.
-- Delta event routing by tile.
-- No cross-tile event leakage.
-- Resync-required behavior when event delivery cannot be trusted.
-
-#### Schema / Migration Changes
-
-Add or update tests or verification for:
-
-- Flyway migration validity.
-- JPA schema validation.
-- Required indexes for new query paths.
-- Backward-compatible data assumptions.
-
-#### Performance-Sensitive Changes
-
-When changing queue, hold, WebSocket fanout, Redis, or DB hot-path code, include one of:
-
-- Targeted benchmark.
-- k6 scenario.
-- Measured before/after result.
-- Explicit explanation of why performance is not affected.
+Performance-sensitive changes should include targeted benchmark, k6 scenario, measured before/after result, or explicit explanation of why performance is not affected.
 
 Important metrics:
 
@@ -532,8 +392,6 @@ Important metrics:
 
 ## Verification Commands
 
-Use targeted checks first, then broader checks.
-
 Backend:
 
 ```bash
@@ -545,12 +403,6 @@ Backend with infrastructure:
 
 ```bash
 docker compose up -d postgres redis
-```
-
-Full infrastructure:
-
-```bash
-docker compose up -d
 ```
 
 Frontend:
@@ -570,7 +422,7 @@ docker compose up -d postgres redis
 cd frontend && npm install && npm run build
 ```
 
-If a command cannot be run, explicitly report:
+If a command cannot be run, report:
 
 ```text
 Not verified: <command>
@@ -580,31 +432,11 @@ Risk: <what might be broken>
 
 ---
 
-## Documentation Rules
-
-Update documentation when changing:
-
-- API endpoint shape.
-- Domain terminology.
-- Seat state transition.
-- Queue/admission behavior.
-- Hold/confirm semantics.
-- WebSocket event format.
-- Redis key shape.
-- Migration or local setup.
-- Load-test scenario or success criteria.
-- AI workflow, hook logging, or verification process.
-
-The README is part of the architecture contract. Keep it aligned with implementation.
-
----
-
-## Security / Safety Rules
+## Security Rules
 
 - Do not commit secrets.
 - Do not add real credentials.
 - Keep local defaults local-only.
-- Prefer environment variables for deployable configuration.
 - Do not expose internal actuator endpoints beyond intended local/monitoring use.
 - Do not log raw tokens in committed files.
 - Do not commit Codex transcript logs.
@@ -624,7 +456,7 @@ A change is complete only when:
 - It runs the relevant verification command or reports why it could not be run.
 - It reports remaining risks honestly.
 
-For reservation correctness, the minimum acceptance rule is:
+Reservation correctness minimum:
 
 ```text
 oversell count = 0
