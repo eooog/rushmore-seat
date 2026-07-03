@@ -14,17 +14,24 @@ Roles are not permanent registry entries. A role is created by a conversation bo
 - `/diff`: inspect local changes.
 - `/resume`: re-enter a saved conversation.
 - `/agent`: switch to an existing agent thread.
-- `/permissions`: set what Codex may do without asking.
 - `/status`: inspect active model, approval policy, writable roots, and context state.
 
-Important: `/plan` is planning mode, not a write lock. Planner and Reviewer conversations must use Read Only permissions.
+Important: `/plan` is planning mode, not a write lock. If `/permissions` does not expose a true Read Only mode, do not rely on it for Planner or Reviewer work. Start those roles with a read-only sandbox instead.
+
+Recommended role launch model:
+
+```bash
+codex --sandbox read-only
+```
+
+Use this for Planner and Reviewer conversations. Use normal workspace-write/default mode only for Implementer and Fixer after human approval.
 
 Role mapping:
 
-- Planner: `/new`, `/permissions` -> Read Only, then `/plan`.
-- Implementer: `/new`, write-capable permissions after human approval, then approved Planner Issue plus implementation approval.
-- Reviewer: `/new`, `/permissions` -> Read Only, then `/review` or read-only review agents.
-- Fixer: `/new`, write-capable permissions after selected Review Finding Issue is approved for fixing.
+- Planner: start Codex with `--sandbox read-only`, then `/new`, then `/plan`.
+- Implementer: start Codex in a write-capable mode after human approval, then implement the approved Planner Issue.
+- Reviewer: start Codex with `--sandbox read-only`, then `/new`, then `/review` or read-only review agents.
+- Fixer: start Codex in a write-capable mode after a Review Finding Issue is selected for fixing.
 
 Do not combine CLI commands with duplicate prompt labels. In Codex CLI, use `/plan` for planning and `/review` for review. `Plan only` and `Review only` are fallback phrases only for non-CLI environments.
 
@@ -56,22 +63,17 @@ Do not create a new Issue for every review comment. Create a Review Finding Issu
 
 ### 1. Planner
 
-Start a fresh conversation and lock it down:
+Start a read-only Codex session:
+
+```bash
+codex --sandbox read-only
+```
+
+Then in Codex:
 
 ```text
 /new
-/permissions
-```
-
-Select `Read Only`, then verify:
-
-```text
 /status
-```
-
-Then plan:
-
-```text
 /plan <task>
 
 Read README.md and AGENTS.md before planning.
@@ -109,7 +111,7 @@ Issue label: `enhancement`.
 
 ### 2. Plan Review
 
-For risky changes, review the plan before implementation. Keep permissions in Read Only.
+For risky changes, review the plan before implementation. Keep the same read-only session, or start another read-only session.
 
 ```text
 Review this plan with read-only agents.
@@ -124,21 +126,16 @@ If the plan changes materially, update the Planner Issue before implementation.
 
 ### 3. Implementer
 
-Start a fresh conversation:
+Start a write-capable Codex session only after the Planner Issue is approved by the human.
+
+```bash
+codex
+```
+
+Then in Codex:
 
 ```text
 /new
-```
-
-Switch to the appropriate write-capable permission preset only after the Planner Issue is approved by the human:
-
-```text
-/permissions
-```
-
-Then provide the approved issue and selected plan-review findings:
-
-```text
 Planner Issue:
 <paste issue number and body>
 
@@ -190,22 +187,17 @@ Expected result: confirm all changes are related to the approved issue.
 
 ### 5. Reviewer
 
-Start a fresh conversation and lock it down:
+Start a read-only Codex session:
+
+```bash
+codex --sandbox read-only
+```
+
+Then in Codex:
 
 ```text
 /new
-/permissions
-```
-
-Select `Read Only`, then verify:
-
-```text
 /status
-```
-
-Then review:
-
-```text
 /review
 ```
 
@@ -303,21 +295,16 @@ Found during review of PR #<pr-number>.
 
 ### 8. Fixer
 
-Start a fresh conversation:
+Start a write-capable Codex session only after the Review Finding Issue is selected for fixing.
+
+```bash
+codex
+```
+
+Then in Codex:
 
 ```text
 /new
-```
-
-Switch to the appropriate write-capable permission preset only after the Review Finding Issue is selected for fixing:
-
-```text
-/permissions
-```
-
-Then provide selected findings only:
-
-```text
 Review Finding Issue:
 <paste review-finding issue number and body>
 
@@ -343,14 +330,11 @@ Fixes #<review-finding-issue-number>
 
 ## Re-entering Existing Role Conversations
 
-Use `/resume` or `/agent` only when continuing the same role conversation.
+Use `/resume` or `/agent` only when continuing the same role conversation in a session with the same write policy.
 
-- Continue planner refinement: re-enter the planner conversation. Keep Read Only.
-- Continue implementation after interruption: re-enter the implementer conversation.
-- Continue review discussion: re-enter the reviewer conversation. Keep Read Only.
-- Continue a selected fix: re-enter the fixer conversation.
-
-Switching roles requires `/new`.
+- Planner and Reviewer re-entry must be done from a read-only sandbox session.
+- Implementer and Fixer re-entry may use a write-capable session only for approved work.
+- Switching roles requires `/new`.
 
 Do not turn a planner conversation into an implementer conversation. Do not turn an implementer conversation into a reviewer conversation.
 
@@ -382,18 +366,19 @@ Review fallback:
 Review only. Do not edit files.
 ```
 
-Fallback still requires external enforcement such as a read-only working tree or manual `git status` verification.
+Fallback still requires external enforcement such as read-only sandboxing, a disposable worktree, or manual `git status` verification.
 
 ## Acceptance Criteria
 
 A workflow run is acceptable when:
 
-- planning used `/new`, `/permissions` Read Only, `/status`, and `/plan`
+- Planner and Reviewer were run with `codex --sandbox read-only`
+- planning used `/new`, `/status`, and `/plan`
 - Planner Issue was created with `enhancement`
 - risky plans were reviewed by read-only agents
 - implementation used a separate single-writer conversation after human approval
 - PR linked the Planner Issue with `Closes #...`
-- review used `/new`, `/permissions` Read Only, `/status`, and `/review`
+- review used `/new`, `/status`, and `/review`
 - PR received a review result comment
 - follow-up findings were tracked with `review-finding` Issues only when needed
 - fixes used a separate scoped single-writer conversation
