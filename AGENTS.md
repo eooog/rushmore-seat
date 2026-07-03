@@ -4,7 +4,7 @@
 
 This file applies to the entire `rushmore-seat` repository.
 
-`rushmore-seat` is a large-scale seat reservation system simulation. The goal is not basic reservation CRUD. The system must preserve these architectural goals:
+`rushmore-seat` is a large-scale seat reservation system simulation. It is not a basic reservation CRUD project. Preserve these goals:
 
 - Queue-based traffic admission before seat selection.
 - Admission token validation before seat snapshot, WebSocket subscription, hold, or confirm paths.
@@ -15,7 +15,7 @@ This file applies to the entire `rushmore-seat` repository.
 - Oversell prevention.
 - Load-testable behavior with measurable performance criteria.
 
-Agents must treat `README.md` and this file as the architecture contract unless the task explicitly asks to change the architecture.
+Treat `README.md` and this file as the repository architecture contract unless the task explicitly asks to change the architecture.
 
 ---
 
@@ -62,13 +62,95 @@ Runtime dependencies:
 
 ---
 
+## Codex CLI Workflow Rules
+
+This repository uses Codex CLI command modes as the primary AI workflow interface.
+
+Command semantics:
+
+- `/new`: starts a fresh conversation in the same CLI session.
+- `/plan`: switches the active conversation into planning mode and creates an implementation plan.
+- `/review`: reviews the current working tree.
+- `/diff`: inspects local changes.
+- `/resume`: reloads a saved conversation from the session picker.
+- `/agent`: switches to an existing agent thread from the picker.
+
+Role assignment is conversation-based:
+
+- Planner conversation: `/new`, then `/plan`.
+- Implementer conversation: `/new`, then approved plan plus explicit implementation approval.
+- Reviewer conversation: `/new`, then `/review`.
+- Fixer conversation: `/new`, then selected reviewer findings only.
+
+Do not combine Codex CLI command modes with duplicate prompt labels. In Codex CLI, `/plan` is the planning interface and `/review` is the review interface. Prompt labels such as `Plan only` or `Review only` are fallback patterns only for non-CLI environments.
+
+### Standard Flow
+
+Planner:
+
+```text
+/new
+/plan <task and planning requirements>
+```
+
+Implementer:
+
+```text
+/new
+Approved plan:
+<paste planner output>
+
+Implement the approved plan.
+```
+
+Reviewer:
+
+```text
+/new
+/review
+```
+
+Fixer:
+
+```text
+/new
+Selected reviewer findings:
+<paste selected findings>
+
+Fix only the selected findings.
+```
+
+### Re-entering Existing Role Conversations
+
+Use `/resume` or `/agent` only when continuing the same role conversation.
+
+- Continue planner refinement: `/resume` or `/agent` to the planner conversation.
+- Continue implementation after interruption: `/resume` or `/agent` to the implementer conversation.
+- Continue review discussion: `/resume` or `/agent` to the reviewer conversation.
+- Switch roles: start a fresh conversation with `/new`.
+
+Never turn a planner conversation into an implementer conversation. Never turn an implementer conversation into a reviewer conversation.
+
+### AI Workflow Acceptance Criteria
+
+A workflow run is acceptable when:
+
+- Planning used `/new` followed by `/plan`.
+- Implementation used a separate conversation and explicit approval.
+- Review used `/new` followed by `/review`.
+- Fixes used a separate scoped conversation.
+- Hook logs captured planner, implementer, reviewer, and fixer turns when hooks are enabled.
+- Relevant tests were added or updated.
+- Verification was run or explicitly reported as not run.
+- `/diff` showed no unrelated file changes.
+
+---
+
 ## Non-Negotiable Architecture Rules
 
 ### 1. Preserve Domain Separation
 
 Do not collapse fixed venue layout and per-performance seat state.
-
-Use this conceptual model:
 
 ```text
 Venue
@@ -131,8 +213,6 @@ The queue absorbs large traffic. Only admitted users may reach seat selection, W
 
 The system must remain tile-scoped.
 
-Required flow:
-
 ```text
 Sector selected
   -> Load tile summaries
@@ -166,8 +246,6 @@ Rules:
 ### 6. Use PostgreSQL Conditional Update for Baseline Hold
 
 The baseline hold path must use PostgreSQL conditional update semantics.
-
-Expected behavior:
 
 ```sql
 UPDATE performance_seat
@@ -218,8 +296,6 @@ Rules:
 
 Expired holds must be recoverable even if WebSocket events are lost.
 
-Expected recovery:
-
 ```text
 HELD and hold_expires_at < now()
   -> AVAILABLE
@@ -238,7 +314,7 @@ Rules:
 
 ## Naming Rules
 
-The README states that the current skeleton still has some `event/asset` naming. New code should move toward the target domain language.
+New code should move toward the target domain language.
 
 Prefer:
 
@@ -255,7 +331,7 @@ hold
 confirm
 ```
 
-Avoid adding new code using these legacy names unless modifying existing skeleton code:
+Avoid adding new code using legacy names unless modifying existing skeleton code:
 
 ```text
 event
@@ -263,93 +339,6 @@ asset
 ```
 
 Do not perform broad package renames unless explicitly requested.
-
----
-
-## AI Workflow Rules
-
-This repository is used to demonstrate controlled AI-assisted development. Agents must follow the workflow below.
-
-### 1. Plan First
-
-Before editing files, produce a plan and stop.
-
-The plan must include:
-
-- Objective.
-- Relevant README / AGENTS.md architecture rule.
-- Files likely to change.
-- Expected behavior after the change.
-- Risks and failure modes.
-- Tests to add or update.
-- Verification commands.
-
-Do not edit files during the planning step.
-
-### 2. Human Approval Gate
-
-Do not implement until the user explicitly approves the plan.
-
-Acceptable approval examples:
-
-```text
-계획 승인. 구현해.
-Approved. Implement it.
-Proceed with the approved plan.
-```
-
-If the user asks for planning, review, analysis, risk check, or design only, do not edit files.
-
-### 3. Stay Inside the Approved Scope
-
-During implementation:
-
-- Modify only files required by the approved plan.
-- Do not rewrite unrelated modules.
-- Do not introduce broad renames, new frameworks, or new production dependencies without explicit approval.
-- If implementation reveals that the plan is wrong, stop and report the revised plan before continuing.
-
-### 4. Separate Implementer and Reviewer Behavior
-
-When asked to review, act as a reviewer only.
-
-Reviewer mode rules:
-
-- Do not edit files.
-- Inspect the diff or described change.
-- Report architecture violations, missing tests, concurrency risks, naming drift, and unnecessary complexity.
-- Prefer concrete findings over broad advice.
-
-Implementer mode rules:
-
-- Follow the approved plan.
-- Add or update tests in the same change.
-- Run relevant verification commands when possible.
-- Report unverified commands honestly.
-
-### 5. Traceability
-
-Every meaningful AI-assisted change should leave enough information to reconstruct:
-
-- Initial request.
-- Proposed plan.
-- Human approval or plan modification.
-- Files changed.
-- Tests added or updated.
-- Verification command and result.
-- Remaining risks.
-
-When finishing a task, include a concise summary in this shape:
-
-```text
-Summary:
-- Changed:
-- Tests:
-- Verification:
-- Risks / follow-up:
-```
-
-Do not claim a command passed unless it was actually run.
 
 ---
 
@@ -545,31 +534,26 @@ Important metrics:
 
 Use targeted checks first, then broader checks.
 
-### Backend
+Backend:
 
 ```bash
 ./gradlew :backend:test
-```
-
-```bash
 ./gradlew :backend:build
 ```
 
-### Backend with Infrastructure
-
-Start local dependencies when tests or manual checks require PostgreSQL or Redis:
+Backend with infrastructure:
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-For metrics/dashboard work:
+Full infrastructure:
 
 ```bash
 docker compose up -d
 ```
 
-### Frontend
+Frontend:
 
 ```bash
 cd frontend
@@ -577,9 +561,7 @@ npm install
 npm run build
 ```
 
-### Full Local Verification
-
-For changes touching backend, frontend, and infrastructure:
+Full local verification:
 
 ```bash
 docker compose up -d postgres redis
