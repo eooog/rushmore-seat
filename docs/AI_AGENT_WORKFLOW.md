@@ -14,13 +14,17 @@ Roles are not permanent registry entries. A role is created by a conversation bo
 - `/diff`: inspect local changes.
 - `/resume`: re-enter a saved conversation.
 - `/agent`: switch to an existing agent thread.
+- `/permissions`: set what Codex may do without asking.
+- `/status`: inspect active model, approval policy, writable roots, and context state.
+
+Important: `/plan` is planning mode, not a write lock. Planner and Reviewer conversations must use Read Only permissions.
 
 Role mapping:
 
-- Planner: `/new` then `/plan`.
-- Implementer: `/new` then approved planner issue plus implementation approval.
-- Reviewer: `/new` then `/review` or read-only review agents.
-- Fixer: `/new` then selected reviewer findings only.
+- Planner: `/new`, `/permissions` -> Read Only, then `/plan`.
+- Implementer: `/new`, write-capable permissions after human approval, then approved Planner Issue plus implementation approval.
+- Reviewer: `/new`, `/permissions` -> Read Only, then `/review` or read-only review agents.
+- Fixer: `/new`, write-capable permissions after selected Review Finding Issue is approved for fixing.
 
 Do not combine CLI commands with duplicate prompt labels. In Codex CLI, use `/plan` for planning and `/review` for review. `Plan only` and `Review only` are fallback phrases only for non-CLI environments.
 
@@ -52,10 +56,22 @@ Do not create a new Issue for every review comment. Create a Review Finding Issu
 
 ### 1. Planner
 
-Start a fresh conversation:
+Start a fresh conversation and lock it down:
 
 ```text
 /new
+/permissions
+```
+
+Select `Read Only`, then verify:
+
+```text
+/status
+```
+
+Then plan:
+
+```text
 /plan <task>
 
 Read README.md and AGENTS.md before planning.
@@ -63,6 +79,14 @@ Return objective, architecture rules, likely files, expected behavior, risks, te
 ```
 
 Expected result: plan only, no implementation, no file edits.
+
+After planning, verify locally:
+
+```bash
+git status --short
+```
+
+Expected: no output.
 
 Then create a GitHub Issue:
 
@@ -85,7 +109,7 @@ Issue label: `enhancement`.
 
 ### 2. Plan Review
 
-For risky changes, review the plan before implementation.
+For risky changes, review the plan before implementation. Keep permissions in Read Only.
 
 ```text
 Review this plan with read-only agents.
@@ -104,6 +128,12 @@ Start a fresh conversation:
 
 ```text
 /new
+```
+
+Switch to the appropriate write-capable permission preset only after the Planner Issue is approved by the human:
+
+```text
+/permissions
 ```
 
 Then provide the approved issue and selected plan-review findings:
@@ -160,10 +190,22 @@ Expected result: confirm all changes are related to the approved issue.
 
 ### 5. Reviewer
 
-Start a fresh conversation:
+Start a fresh conversation and lock it down:
 
 ```text
 /new
+/permissions
+```
+
+Select `Read Only`, then verify:
+
+```text
+/status
+```
+
+Then review:
+
+```text
 /review
 ```
 
@@ -174,7 +216,15 @@ Use read-only review agents for architecture drift, missing tests, concurrency r
 Do not edit files.
 ```
 
-Expected result: review findings only.
+Expected result: review findings only, no file edits.
+
+After review, verify locally:
+
+```bash
+git status --short
+```
+
+No files should be changed by the Reviewer.
 
 Reviewer must choose one decision:
 
@@ -259,6 +309,12 @@ Start a fresh conversation:
 /new
 ```
 
+Switch to the appropriate write-capable permission preset only after the Review Finding Issue is selected for fixing:
+
+```text
+/permissions
+```
+
 Then provide selected findings only:
 
 ```text
@@ -289,9 +345,9 @@ Fixes #<review-finding-issue-number>
 
 Use `/resume` or `/agent` only when continuing the same role conversation.
 
-- Continue planner refinement: re-enter the planner conversation.
+- Continue planner refinement: re-enter the planner conversation. Keep Read Only.
 - Continue implementation after interruption: re-enter the implementer conversation.
-- Continue review discussion: re-enter the reviewer conversation.
+- Continue review discussion: re-enter the reviewer conversation. Keep Read Only.
 - Continue a selected fix: re-enter the fixer conversation.
 
 Switching roles requires `/new`.
@@ -326,16 +382,18 @@ Review fallback:
 Review only. Do not edit files.
 ```
 
+Fallback still requires external enforcement such as a read-only working tree or manual `git status` verification.
+
 ## Acceptance Criteria
 
 A workflow run is acceptable when:
 
-- planning used `/new` followed by `/plan`
+- planning used `/new`, `/permissions` Read Only, `/status`, and `/plan`
 - Planner Issue was created with `enhancement`
 - risky plans were reviewed by read-only agents
-- implementation used a separate single-writer conversation
+- implementation used a separate single-writer conversation after human approval
 - PR linked the Planner Issue with `Closes #...`
-- review used `/new` followed by `/review` or read-only review agents
+- review used `/new`, `/permissions` Read Only, `/status`, and `/review`
 - PR received a review result comment
 - follow-up findings were tracked with `review-finding` Issues only when needed
 - fixes used a separate scoped single-writer conversation
