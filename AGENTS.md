@@ -31,17 +31,20 @@ Command semantics:
 - `/diff`: inspect local changes.
 - `/resume`: re-enter a saved conversation.
 - `/agent`: switch to an existing agent thread.
-- `/permissions`: set what Codex may do without asking.
 - `/status`: inspect active model, approval policy, writable roots, and context state.
 
-Important: `/plan` is not a write lock. Planner and Reviewer conversations must use Read Only permissions.
+Important: `/plan` is not a write lock. If `/permissions` does not expose a true Read Only mode, do not rely on it for Planner or Reviewer work. Start Planner and Reviewer sessions with:
+
+```bash
+codex --sandbox read-only
+```
 
 Role assignment is conversation-based:
 
-- Planner: `/new`, `/permissions` -> Read Only, `/status`, then `/plan`.
-- Implementer: `/new`, write-capable permissions after human approval, then approved Planner Issue plus explicit implementation approval.
-- Reviewer: `/new`, `/permissions` -> Read Only, `/status`, then `/review` or read-only review agents.
-- Fixer: `/new`, write-capable permissions after selected Review Finding Issue is approved for fixing.
+- Planner: start Codex with `--sandbox read-only`, then `/new`, `/status`, `/plan`.
+- Implementer: start Codex in a write-capable mode after human approval, then approved Planner Issue plus explicit implementation approval.
+- Reviewer: start Codex with `--sandbox read-only`, then `/new`, `/status`, `/review` or read-only review agents.
+- Fixer: start Codex in a write-capable mode after selected Review Finding Issue is approved for fixing.
 
 Do not combine CLI commands with duplicate prompt labels. In Codex CLI, `/plan` is the planning interface and `/review` is the review interface. `Plan only` and `Review only` are fallback phrases only for non-CLI environments.
 
@@ -71,14 +74,17 @@ Implementation and fixing must use one writer conversation. Review agents must r
 
 Planner:
 
+```bash
+codex --sandbox read-only
+```
+
 ```text
 /new
-/permissions
 /status
 /plan <task and planning requirements>
 ```
 
-Planner must use Read Only permissions. After planning, `git status --short` must show no changes.
+Planner must not change files. After planning, `git status --short` must show no changes.
 
 Plan review for risky work:
 
@@ -90,6 +96,10 @@ Do not edit files.
 ```
 
 Implementer:
+
+```bash
+codex
+```
 
 ```text
 /new
@@ -104,16 +114,23 @@ Implement the approved issue.
 
 Reviewer:
 
+```bash
+codex --sandbox read-only
+```
+
 ```text
 /new
-/permissions
 /status
 /review
 ```
 
-Reviewer must use Read Only permissions. After review, `git status --short` must show no review-created file changes.
+Reviewer must not change files. After review, `git status --short` must show no review-created changes.
 
 Fixer:
+
+```bash
+codex
+```
 
 ```text
 /new
@@ -125,12 +142,10 @@ Fix only this issue.
 
 ### Re-entering Existing Role Conversations
 
-Use `/resume` or `/agent` only when continuing the same role conversation.
+Use `/resume` or `/agent` only when continuing the same role conversation with the same write policy.
 
-- Continue planner refinement: re-enter the planner conversation and keep Read Only.
-- Continue implementation after interruption: re-enter the implementer conversation.
-- Continue review discussion: re-enter the reviewer conversation and keep Read Only.
-- Continue selected fix: re-enter the fixer conversation.
+- Planner and Reviewer re-entry must happen from a `codex --sandbox read-only` session.
+- Implementer and Fixer re-entry may use a write-capable session only for approved work.
 - Switch roles: start a fresh conversation with `/new`.
 
 Do not turn a planner conversation into an implementer conversation. Do not turn an implementer conversation into a reviewer conversation.
@@ -139,12 +154,13 @@ Do not turn a planner conversation into an implementer conversation. Do not turn
 
 A workflow run is acceptable when:
 
-- Planning used `/new`, `/permissions` Read Only, `/status`, and `/plan`.
+- Planner and Reviewer were run with `codex --sandbox read-only`.
+- Planning used `/new`, `/status`, and `/plan`.
 - Planner Issue was created with label `enhancement`.
 - Risky plans were reviewed by read-only agents.
 - Implementation used a separate single-writer conversation and explicit approval.
 - PR linked the Planner Issue with `Closes #...`.
-- Review used `/new`, `/permissions` Read Only, `/status`, and `/review` or read-only review agents.
+- Review used `/new`, `/status`, and `/review` or read-only review agents.
 - PR received a review result comment.
 - Follow-up findings were tracked with `review-finding` Issues only when needed.
 - Fix PRs linked Review Finding Issues with `Fixes #...`.
