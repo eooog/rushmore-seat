@@ -35,17 +35,31 @@ Command semantics:
 Role assignment is conversation-based:
 
 - Planner: `/new`, then `/plan`.
-- Implementer: `/new`, then approved plan plus explicit implementation approval.
+- Implementer: `/new`, then approved Planner Issue plus explicit implementation approval.
 - Reviewer: `/new`, then `/review` or read-only review agents.
-- Fixer: `/new`, then selected reviewer findings only.
+- Fixer: `/new`, then selected Review Finding Issue only.
 
 Do not combine CLI commands with duplicate prompt labels. In Codex CLI, `/plan` is the planning interface and `/review` is the review interface. `Plan only` and `Review only` are fallback phrases only for non-CLI environments.
 
-### Multi-Agent Policy
-
 Detailed workflow is in `docs/AI_AGENT_WORKFLOW.md`.
 
-Use multiple agents only for read-only research and review. Useful review lanes are architecture, concurrency, tests, persistence boundaries, naming, and scope control.
+### GitHub Tracking Rules
+
+GitHub is the traceability layer.
+
+- Planner creates a GitHub Issue with label `enhancement`.
+- Implementer creates a PR linked to the Planner Issue with `Closes #<issue-number>`.
+- Reviewer leaves a PR review decision and summary comment.
+- Reviewer creates a new Issue only for findings that must be tracked outside the current PR.
+- Review Finding Issues must have label `review-finding`.
+- Add `bug`, `documentation`, `question`, or `invalid` as a secondary label when applicable.
+- Fixer creates a PR linked to the Review Finding Issue with `Fixes #<issue-number>`.
+
+Do not create Review Finding Issues for every PR comment. PR comments are for the current PR. Review Finding Issues are for independent follow-up work.
+
+### Multi-Agent Policy
+
+Use multiple agents only for read-only research and review. Useful lanes are architecture, concurrency, tests, persistence boundaries, naming, and scope control.
 
 Implementation and fixing must use one writer conversation. Review agents must return findings only. A human selects which findings move to the fixer conversation.
 
@@ -71,13 +85,13 @@ Implementer:
 
 ```text
 /new
-Approved plan:
-<paste planner output>
+Planner Issue:
+<paste issue number and body>
 
 Approved plan-review findings:
 <paste selected findings>
 
-Implement the approved plan.
+Implement the approved issue.
 ```
 
 Reviewer:
@@ -91,10 +105,10 @@ Fixer:
 
 ```text
 /new
-Selected reviewer findings:
-<paste selected findings>
+Review Finding Issue:
+<paste review-finding issue number and body>
 
-Fix only the selected findings.
+Fix only this issue.
 ```
 
 ### Re-entering Existing Role Conversations
@@ -114,10 +128,14 @@ Do not turn a planner conversation into an implementer conversation. Do not turn
 A workflow run is acceptable when:
 
 - Planning used `/new` followed by `/plan`.
+- Planner Issue was created with label `enhancement`.
 - Risky plans were reviewed by read-only agents.
 - Implementation used a separate single-writer conversation and explicit approval.
+- PR linked the Planner Issue with `Closes #...`.
 - Review used `/new` followed by `/review` or read-only review agents.
-- Fixes used a separate scoped single-writer conversation.
+- PR received a review result comment.
+- Follow-up findings were tracked with `review-finding` Issues only when needed.
+- Fix PRs linked Review Finding Issues with `Fixes #...`.
 - Relevant tests were added or updated.
 - Verification was run or explicitly reported as not run.
 - `/diff` showed no unrelated file changes.
