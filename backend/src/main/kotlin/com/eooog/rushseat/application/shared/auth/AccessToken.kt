@@ -9,19 +9,10 @@ value class AccessToken private constructor(
         private val PATTERN = Regex("^acc_[A-Za-z0-9_-]{43}$")
 
         fun parse(raw: String): AccessToken {
-            return parseOrNull(raw)
-                ?: throw IllegalArgumentException("Invalid access token format")
-        }
+            val normalized = raw.trim()
 
-        fun parseOrNull(raw: String?): AccessToken? {
-            val normalized = raw?.trim()
-
-            if (normalized.isNullOrBlank()) {
-                return null
-            }
-
-            if (!PATTERN.matches(normalized)) {
-                return null
+            require(PATTERN.matches(normalized)) {
+                "Invalid Access Token Format"
             }
 
             return AccessToken(normalized)
