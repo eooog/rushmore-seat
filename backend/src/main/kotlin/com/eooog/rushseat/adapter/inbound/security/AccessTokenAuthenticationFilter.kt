@@ -42,12 +42,13 @@ class AccessTokenAuthenticationFilter(
     }
 
     private fun extractAccessToken(request: HttpServletRequest): AccessToken? {
+
         val authorization = request.getHeader(HttpHeaders.AUTHORIZATION) ?: return null
 
-        if (!authorization.startsWith("Bearer ")) {
-            return null
-        }
+        val rawToken = authorization
+            .removePrefix("Bearer")
+            .trim()
 
-        return AccessToken.parse(authorization)
+        return AccessToken.parse(rawToken)
     }
 }
