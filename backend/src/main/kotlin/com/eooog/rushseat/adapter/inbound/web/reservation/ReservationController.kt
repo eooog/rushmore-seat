@@ -1,4 +1,4 @@
-package com.eooog.rushseat.adapter.inbound.reservation.web
+package com.eooog.rushseat.adapter.inbound.web.reservation
 
 import com.eooog.rushseat.application.reservation.ConfirmReservationCommand
 import com.eooog.rushseat.application.reservation.ConfirmReservationResult

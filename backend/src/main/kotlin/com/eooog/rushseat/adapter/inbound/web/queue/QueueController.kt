@@ -1,4 +1,4 @@
-package com.eooog.rushseat.adapter.inbound.queue.web
+package com.eooog.rushseat.adapter.inbound.web.queue
 
 import com.eooog.rushseat.application.queue.AdmitQueueCommand
 import com.eooog.rushseat.application.queue.AdmitQueueResult
