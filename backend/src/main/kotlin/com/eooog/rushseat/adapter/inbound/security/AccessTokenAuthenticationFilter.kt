@@ -46,7 +46,7 @@ class AccessTokenAuthenticationFilter(
         val authorization = request.getHeader(HttpHeaders.AUTHORIZATION) ?: return null
 
         val rawToken = authorization
-            .removePrefix("Bearer")
+            .removePrefix("Bearer ")
             .trim()
 
         return AccessToken.parse(rawToken)
