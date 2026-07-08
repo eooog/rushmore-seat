@@ -73,6 +73,10 @@ class AuthTestConfig {
             return entry.memberId
         }
 
+        fun clear() {
+            store.clear()
+        }
+
         private data class Entry(
             val memberId: Long,
             val expiredAt: Instant,
