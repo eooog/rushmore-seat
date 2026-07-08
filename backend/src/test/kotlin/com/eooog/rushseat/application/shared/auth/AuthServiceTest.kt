@@ -1,5 +1,6 @@
 package com.eooog.rushseat.application.shared.auth
 
+import com.eooog.rushseat.application.shared.auth.AuthTestConfig.FakeAccessTokenStorePort
 import com.eooog.rushseat.support.time.TestClock
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
@@ -18,27 +19,17 @@ class AuthServiceTest {
     @Autowired
     lateinit var clock: TestClock
 
+    @Autowired
+    lateinit var fakeAccessTokenStorePort: FakeAccessTokenStorePort
+
     private val memberId = 259L
     private val accessTokenTtl = Duration.ofSeconds(600)
 
     @BeforeEach
     fun setUp() {
         clock.reset()
+        fakeAccessTokenStorePort.clear()
     }
-
-    @Test
-    fun `issue() should save generated access token`() {
-
-        val issueResult = authService.issue(
-            IssueAccessTokenCommand(memberId)
-        )
-
-        val principal = authService.verify(issueResult.accessToken)
-
-        assertThat(principal).isNotNull
-        assertThat(principal!!.memberId).isEqualTo(memberId)
-    }
-
 
     @Test
     fun `issue() should return issued token and memberId`() {
@@ -102,7 +93,7 @@ class AuthServiceTest {
             IssueAccessTokenCommand(memberId = memberId),
         )
 
-        clock.advance(Duration.ofSeconds(600).minusNanos(1))
+        clock.advance(accessTokenTtl.minusNanos(1))
 
         val principal = authService.verify(issueResult.accessToken)
 
