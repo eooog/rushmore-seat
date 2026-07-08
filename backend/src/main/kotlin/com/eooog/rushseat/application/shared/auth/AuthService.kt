@@ -11,11 +11,9 @@ import java.time.Duration
 class AuthService(
     private val accessTokenGenerator: AccessTokenGenerator,
     private val accessTokenStorePort: AccessTokenStorePort,
-    @Value("\${rushmore-seat.auth.access-token-ttl-seconds}") accessTokenTtlSeconds: Long,
+    @Value("\${rushmore-seat.auth.access-token-ttl-seconds:600s}") private val accessTokenTtl: Duration,
 ) : IssueAccessTokenUseCase,
     AccessTokenVerifier {
-
-    private val accessTokenTtl: Duration = Duration.ofSeconds(accessTokenTtlSeconds)
 
     override fun issue(command: IssueAccessTokenCommand): IssueAccessTokenResult {
         require(command.memberId > 0) {
@@ -36,8 +34,8 @@ class AuthService(
         )
     }
 
-    override fun verify(accessToken: AccessToken): MemberPrincipal? {
-        val memberId = accessTokenStorePort.findMemberId(accessToken)
+    override fun verify(token: AccessToken): MemberPrincipal? {
+        val memberId = accessTokenStorePort.findMemberId(token)
             ?: return null
 
         return MemberPrincipal(memberId = memberId)
