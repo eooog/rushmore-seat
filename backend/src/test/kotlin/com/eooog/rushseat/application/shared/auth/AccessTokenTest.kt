@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test
 
 class AccessTokenTest {
 
-    val prefix = "acc"
-    val tokenBody = "rPgv_HzZx7I6OMBV8B04CKr9WB-PB2yWItbMBFsV0vk"
-    val raw = "${prefix}_${tokenBody}"
+    private val prefix = "acc"
+    private val tokenBody = "rPgv_HzZx7I6OMBV8B04CKr9WB-PB2yWItbMBFsV0vk"
+    private val raw = "${prefix}_${tokenBody}"
 
     @Test
     fun `Valid Raw Can Be Parsed`() {
@@ -42,9 +42,19 @@ class AccessTokenTest {
 
 
     @Test
-    fun `InValid Token Length Throws Exception`() {
+    fun `InValid Too Long Token Throws Exception`() {
 
-        val invalidRaw = "${raw}___"
+        val invalidRaw = "acc_${"a".repeat(44)}"
+
+        Assertions.assertThatThrownBy { AccessToken.parse(invalidRaw) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Invalid Access Token Format")
+    }
+
+    @Test
+    fun `InValid Too Short Token Throws Exception`() {
+
+        val invalidRaw = "acc_${"a".repeat(42)}"
 
         Assertions.assertThatThrownBy { AccessToken.parse(invalidRaw) }
             .isInstanceOf(IllegalArgumentException::class.java)
@@ -54,9 +64,11 @@ class AccessTokenTest {
     @Test
     fun `InValid Token Character Throws Exception`() {
 
-        val invalidTokenBody = "rPgv_HzZx7I6OMBV8B||CKr9WB-PB2yWItbMBFsV0vk"
+        val invalidTokenBody = "rPgv_HzZx7I6OMBV8B04CKr9WB-PB2yWItbMBFsV0v!"
 
         val invalidRaw = "${raw}${invalidTokenBody}"
+
+        assertThat(invalidTokenBody).hasSize(43)
 
         Assertions.assertThatThrownBy { AccessToken.parse(invalidRaw) }
             .isInstanceOf(IllegalArgumentException::class.java)
