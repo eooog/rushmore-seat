@@ -11,7 +11,7 @@ import java.time.Duration
 class AuthService(
     private val accessTokenGenerator: AccessTokenGenerator,
     private val accessTokenStorePort: AccessTokenStorePort,
-    @Value("\${rushmore-seat.auth.access-token-ttl-seconds:600s}") private val accessTokenTtl: Duration,
+    @Value("\${rushmore-seat.auth.access-token-ttl:600s}") private val accessTokenTtl: Duration,
 ) : IssueAccessTokenUseCase,
     AccessTokenVerifier {
 
