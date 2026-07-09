@@ -28,12 +28,6 @@ interface LoadReservationPort {
         memberId: Long,
         idempotencyKey: String,
     ): ReservationSnapshot?
-
-    fun findByHoldToken(
-        performanceId: Long,
-        memberId: Long,
-        holdToken: String,
-    ): ReservationSnapshot?
 }
 
 data class ReservationSnapshot(
@@ -108,6 +102,7 @@ interface ConfirmReservationPort {
 data class ConfirmReservationRecordCommand(
     val performanceId: Long,
     val memberId: Long,
+    val reservationId: Long,
     val confirmedAt: Instant,
 )
 

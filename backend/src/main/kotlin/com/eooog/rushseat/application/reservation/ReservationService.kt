@@ -171,6 +171,7 @@ class ReservationService(
                 ConfirmReservationRecordCommand(
                     performanceId = command.performanceId,
                     memberId = command.memberId,
+                    reservationId = command.reservationId,
                     confirmedAt = command.requestedAt,
                 ),
             )

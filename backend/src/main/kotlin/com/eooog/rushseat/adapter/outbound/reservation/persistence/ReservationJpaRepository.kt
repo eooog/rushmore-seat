@@ -23,4 +23,20 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
         @Param("memberId") memberId: Long,
         @Param("idempotencyKey") idempotencyKey: String,
     ): Reservation?
+
+    @Query(
+        """
+    SELECT r
+    FROM Reservation r
+    JOIN FETCH r.performanceSeat
+    WHERE r.id = :reservationId
+      AND r.performance.id = :performanceId
+      AND r.member.id = :memberId
+    """,
+    )
+    fun findForConfirm(
+        @Param("reservationId") reservationId: Long,
+        @Param("performanceId") performanceId: Long,
+        @Param("memberId") memberId: Long,
+    ): Reservation?
 }

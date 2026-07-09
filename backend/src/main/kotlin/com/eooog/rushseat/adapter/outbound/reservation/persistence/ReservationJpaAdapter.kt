@@ -54,18 +54,6 @@ class ReservationJpaAdapter(
                 idempotencyKey = idempotencyKey,
             )?.toSnapshot()
 
-    override fun findByHoldToken(
-        performanceId: Long,
-        memberId: Long,
-        holdToken: String,
-    ): ReservationSnapshot? =
-        reservationRepository
-            .findByHoldToken(
-                performanceId = performanceId,
-                memberId = memberId,
-                holdToken = holdToken,
-            )?.toSnapshot()
-
     override fun load(command: LoadReservationReferencesCommand): ReservationReferences? {
         val performance =
             entityManager.find(Performance::class.java, command.performanceId)
@@ -91,21 +79,27 @@ class ReservationJpaAdapter(
         )
     }
 
-    // TODO hold token <
     override fun confirm(command: ConfirmReservationRecordCommand): ConfirmReservationRecordResult {
         val reservation =
-            reservationRepository.findByHoldToken(
+            reservationRepository.findForConfirm(
+                reservationId = command.reservationId,
                 performanceId = command.performanceId,
                 memberId = command.memberId,
-            ) ?: return ConfirmReservationRecordResult(reservationId = null)
+            )
+                ?: return ConfirmReservationRecordResult(
+                    reservationId = null,
+                )
 
         if (reservation.isExpired(command.confirmedAt)) {
-            return ConfirmReservationRecordResult(reservationId = null)
+            error("Reservation is already expired")
         }
 
         reservation.confirm(command.confirmedAt)
+
         return ConfirmReservationRecordResult(
-            reservationId = reservation.id,
+            reservationId =
+                reservation.id
+                    ?: error("Reservation id is null"),
         )
     }
 

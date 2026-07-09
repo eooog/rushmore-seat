@@ -48,9 +48,10 @@ class ReservationController(
         return result.toResponse()
     }
 
-    @PostMapping("/performances/{performanceId}/reservations/confirm")
+    @PostMapping("/performances/{performanceId}/reservations/{reservationId}/confirm")
     fun confirm(
         @PathVariable performanceId: Long,
+        @PathVariable reservationId: Long,
         @AuthenticationPrincipal principal: MemberPrincipal,
     ): ConfirmReservationResponse {
         val result =
@@ -58,6 +59,7 @@ class ReservationController(
                 ConfirmReservationCommand(
                     performanceId = performanceId,
                     memberId = principal.memberId,
+                    reservationId = reservationId,
                     requestedAt = clock.instant(),
                 ),
             )

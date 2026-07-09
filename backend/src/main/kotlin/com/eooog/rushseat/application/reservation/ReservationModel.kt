@@ -14,6 +14,7 @@ data class HoldSeatCommand(
 data class ConfirmReservationCommand(
     val performanceId: Long,
     val memberId: Long,
+    val reservationId: Long,
     val requestedAt: Instant,
 )
 
