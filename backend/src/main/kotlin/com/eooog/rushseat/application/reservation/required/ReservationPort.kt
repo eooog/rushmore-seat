@@ -95,7 +95,6 @@ interface ConfirmPerformanceSeatPort {
 data class ConfirmPerformanceSeatCommand(
     val performanceId: Long,
     val memberId: Long,
-    val holdToken: String,
     val requestedAt: Instant,
 )
 
@@ -111,7 +110,6 @@ interface ConfirmReservationPort {
 data class ConfirmReservationRecordCommand(
     val performanceId: Long,
     val memberId: Long,
-    val holdToken: String,
     val confirmedAt: Instant,
 )
 

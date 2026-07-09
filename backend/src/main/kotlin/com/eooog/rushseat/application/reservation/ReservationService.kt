@@ -138,7 +138,6 @@ class ReservationService(
                 ConfirmPerformanceSeatCommand(
                     performanceId = command.performanceId,
                     memberId = command.memberId,
-                    holdToken = command.holdToken,
                     requestedAt = command.requestedAt,
                 ),
             )
@@ -154,7 +153,6 @@ class ReservationService(
                 ConfirmReservationRecordCommand(
                     performanceId = command.performanceId,
                     memberId = command.memberId,
-                    holdToken = command.holdToken,
                     confirmedAt = command.requestedAt,
                 ),
             )

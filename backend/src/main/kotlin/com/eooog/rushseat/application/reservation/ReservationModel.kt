@@ -6,6 +6,7 @@ data class HoldSeatCommand(
     val performanceId: Long,
     val performanceSeatId: Long,
     val memberId: Long,
+    val admissionToken: String,
     val idempotencyKey: String,
     val requestedAt: Instant,
 )
@@ -13,7 +14,6 @@ data class HoldSeatCommand(
 data class ConfirmReservationCommand(
     val performanceId: Long,
     val memberId: Long,
-    val holdToken: String,
     val requestedAt: Instant,
 )
 

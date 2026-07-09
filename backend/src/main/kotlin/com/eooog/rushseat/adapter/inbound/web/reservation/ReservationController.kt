@@ -8,37 +8,40 @@ import com.eooog.rushseat.application.reservation.HoldSeatResult
 import com.eooog.rushseat.application.reservation.HoldSeatResultStatus
 import com.eooog.rushseat.application.reservation.provided.ConfirmReservationUseCase
 import com.eooog.rushseat.application.reservation.provided.HoldSeatUseCase
+import com.eooog.rushseat.application.shared.auth.MemberPrincipal
 import org.springframework.http.HttpStatus
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
 import java.time.Instant
 
 @RestController
 class ReservationController(
     private val holdSeatUseCase: HoldSeatUseCase,
     private val confirmReservationUseCase: ConfirmReservationUseCase,
+    private val clock: Clock,
 ) {
     @PostMapping("/performances/{performanceId}/seats/{performanceSeatId}/hold")
     fun hold(
         @PathVariable performanceId: Long,
         @PathVariable performanceSeatId: Long,
-        @RequestHeader("Idempotency-Key", required = false) idempotencyKey: String?,
-        @RequestBody request: HoldSeatRequest,
+        @RequestHeader("Idempotency-Key", required = false) idempotencyKey: String,
+        @RequestHeader("X-Admission-Token") admissionToken: String,
+        @AuthenticationPrincipal principal: MemberPrincipal,
     ): HoldSeatResponse {
         val result =
             holdSeatUseCase.hold(
                 HoldSeatCommand(
                     performanceId = performanceId,
                     performanceSeatId = performanceSeatId,
-                    memberId = request.memberId,
-                    idempotencyKey =
-                        idempotencyKey ?: request.idempotencyKey
-                            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required"),
-                    requestedAt = Instant.now(),
+                    memberId = principal.memberId,
+                    admissionToken = admissionToken,
+                    idempotencyKey = idempotencyKey,
+                    requestedAt = clock.instant(),
                 ),
             )
 
@@ -48,14 +51,13 @@ class ReservationController(
     @PostMapping("/performances/{performanceId}/reservations/confirm")
     fun confirm(
         @PathVariable performanceId: Long,
-        @RequestBody request: ConfirmReservationRequest,
+        @AuthenticationPrincipal principal: MemberPrincipal,
     ): ConfirmReservationResponse {
         val result =
             confirmReservationUseCase.confirm(
                 ConfirmReservationCommand(
                     performanceId = performanceId,
-                    memberId = request.memberId,
-                    holdToken = request.holdToken,
+                    memberId = principal.memberId,
                     requestedAt = Instant.now(),
                 ),
             )
@@ -111,22 +113,12 @@ class ReservationController(
         }
 }
 
-data class HoldSeatRequest(
-    val memberId: Long,
-    val idempotencyKey: String? = null,
-)
-
 data class HoldSeatResponse(
     val status: String,
     val reservationId: Long?,
     val performanceSeatId: Long,
     val holdToken: String?,
     val expiresAt: Instant?,
-)
-
-data class ConfirmReservationRequest(
-    val memberId: Long,
-    val holdToken: String,
 )
 
 data class ConfirmReservationResponse(

@@ -71,14 +71,12 @@ class PerformanceSeatJdbcAdapter(
                         updated_at = now()
                     WHERE performance_id = :performanceId
                       AND hold_member_id = :memberId
-                      AND hold_token = :holdToken
                       AND status = 'HELD'
                       AND hold_expires_at > :requestedAt
                     RETURNING id
                     """.trimIndent(),
                 ).param("performanceId", command.performanceId)
                 .param("memberId", command.memberId)
-                .param("holdToken", command.holdToken)
                 .param("requestedAt", command.requestedAt)
                 .query(Long::class.java)
                 .optional()
