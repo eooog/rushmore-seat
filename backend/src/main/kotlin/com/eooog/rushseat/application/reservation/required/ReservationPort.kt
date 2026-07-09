@@ -42,7 +42,6 @@ data class ReservationSnapshot(
     val performanceSeatId: Long,
     val memberId: Long,
     val status: ReservationStatus,
-    val holdToken: String,
     val expiresAt: Instant?,
 )
 
@@ -70,7 +69,6 @@ data class HoldPerformanceSeatCommand(
     val performanceId: Long,
     val performanceSeatId: Long,
     val memberId: Long,
-    val holdToken: String,
     val expiresAt: Instant,
 )
 

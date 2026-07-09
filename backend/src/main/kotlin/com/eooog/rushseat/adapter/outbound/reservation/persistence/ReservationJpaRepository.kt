@@ -23,22 +23,4 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
         @Param("memberId") memberId: Long,
         @Param("idempotencyKey") idempotencyKey: String,
     ): Reservation?
-
-    @Query(
-        """
-        SELECT r
-        FROM Reservation r
-        JOIN FETCH r.performance
-        JOIN FETCH r.performanceSeat
-        JOIN FETCH r.member
-        WHERE r.performance.id = :performanceId
-          AND r.member.id = :memberId
-          AND r.holdToken = :holdToken
-        """,
-    )
-    fun findByHoldToken(
-        @Param("performanceId") performanceId: Long,
-        @Param("memberId") memberId: Long,
-        @Param("holdToken") holdToken: String,
-    ): Reservation?
 }

@@ -91,12 +91,12 @@ class ReservationJpaAdapter(
         )
     }
 
+    // TODO hold token <
     override fun confirm(command: ConfirmReservationRecordCommand): ConfirmReservationRecordResult {
         val reservation =
             reservationRepository.findByHoldToken(
                 performanceId = command.performanceId,
                 memberId = command.memberId,
-                holdToken = command.holdToken,
             ) ?: return ConfirmReservationRecordResult(reservationId = null)
 
         if (reservation.isExpired(command.confirmedAt)) {
@@ -116,7 +116,6 @@ class ReservationJpaAdapter(
             performanceSeatId = performanceSeat.id ?: error("Performance seat id is null"),
             memberId = member.id ?: error("Member id is null"),
             status = status,
-            holdToken = holdToken,
             expiresAt = expiresAt,
         )
 }

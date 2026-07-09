@@ -46,10 +46,6 @@ class Reservation protected constructor() : AuditableEntity() {
     var status: ReservationStatus = ReservationStatus.HELD
         protected set
 
-    @field:Column(name = "hold_token", nullable = false, length = 120)
-    lateinit var holdToken: String
-        protected set
-
     @field:Column(name = "idempotency_key", nullable = false, length = 120)
     lateinit var idempotencyKey: String
         protected set
@@ -99,7 +95,6 @@ class Reservation protected constructor() : AuditableEntity() {
             performance: Performance,
             performanceSeat: PerformanceSeat,
             member: Member,
-            holdToken: String,
             idempotencyKey: String,
             expiresAt: Instant,
         ): Reservation {
@@ -112,18 +107,10 @@ class Reservation protected constructor() : AuditableEntity() {
                 this.performanceSeat = performanceSeat
                 this.member = member
                 this.status = ReservationStatus.HELD
-                this.holdToken = validateHoldToken(holdToken)
                 this.idempotencyKey = validateIdempotencyKey(idempotencyKey)
                 this.expiresAt = expiresAt
                 this.confirmedAt = null
             }
-        }
-
-        private fun validateHoldToken(holdToken: String): String {
-            val normalized = holdToken.trim()
-            require(normalized.isNotBlank()) { "좌석 선점 토큰은 비어 있을 수 없습니다" }
-            require(normalized.length <= 120) { "좌석 선점 토큰은 120자를 초과할 수 없습니다" }
-            return normalized
         }
 
         private fun validateIdempotencyKey(idempotencyKey: String): String {

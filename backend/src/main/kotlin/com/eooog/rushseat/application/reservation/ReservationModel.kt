@@ -20,6 +20,7 @@ data class ConfirmReservationCommand(
 enum class HoldSeatResultStatus {
     HELD,
     ALREADY_PROCESSED,
+    PERFORMANCE_NOT_FOUND,
     NOT_ON_SALE,
     UNAVAILABLE,
 }

@@ -32,7 +32,6 @@ class PerformanceSeatJdbcAdapter(
                       AND status = 'AVAILABLE'
                     """.trimIndent(),
                 ).param("memberId", command.memberId)
-                .param("holdToken", command.holdToken)
                 .param("expiresAt", command.expiresAt)
                 .param("performanceSeatId", command.performanceSeatId)
                 .param("performanceId", command.performanceId)

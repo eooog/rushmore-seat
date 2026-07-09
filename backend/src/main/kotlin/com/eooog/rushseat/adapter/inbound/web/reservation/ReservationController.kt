@@ -79,6 +79,13 @@ class ReservationController(
                 )
             }
 
+            HoldSeatResultStatus.PERFORMANCE_NOT_FOUND -> {
+                throw ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Performance is not found",
+                )
+            }
+
             HoldSeatResultStatus.NOT_ON_SALE -> {
                 throw ResponseStatusException(
                     HttpStatus.CONFLICT,

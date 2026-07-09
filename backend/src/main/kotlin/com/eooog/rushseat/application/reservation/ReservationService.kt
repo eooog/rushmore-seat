@@ -16,13 +16,13 @@ import com.eooog.rushseat.application.reservation.required.PublishSeatChangePort
 import com.eooog.rushseat.application.reservation.required.SaveReservationPort
 import com.eooog.rushseat.application.reservation.required.SeatHeldEvent
 import com.eooog.rushseat.application.reservation.required.SeatReservedEvent
+import com.eooog.rushseat.application.reservation.required.ValidateReservationAdmissionCommand
+import com.eooog.rushseat.application.reservation.required.ValidateReservationAdmissionPort
 import com.eooog.rushseat.domain.reservation.Reservation
-import com.eooog.rushseat.domain.reservation.ReservationStatus
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
-import java.util.UUID
 
 @Service
 class ReservationService(
@@ -34,27 +34,29 @@ class ReservationService(
     private val confirmPerformanceSeatPort: ConfirmPerformanceSeatPort,
     private val confirmReservationPort: ConfirmReservationPort,
     private val publishSeatChangePort: PublishSeatChangePort,
+    private val validateReservationAdmissionPort: ValidateReservationAdmissionPort,
     @Value("\${rushmore-seat.hold.ttl-seconds}") holdTtlSeconds: Long,
 ) : HoldSeatUseCase,
     ConfirmReservationUseCase {
     private val holdTtl: Duration = Duration.ofSeconds(holdTtlSeconds)
 
+    // TODO: 좌석 선점 트랜잭션 범위를 축소한다.
+    // 좌석 조건부 업데이트, 예약 저장, Outbox 저장만 하나의 트랜잭션으로 묶는다.
+    // Admission Token 검증과 그 밖의 비트랜잭션 작업은 트랜잭션 외부로 분리한다.
+    // 좌석 변경 이벤트는 Transactional Outbox를 통해 짧은 커밋 이후 발행하여
+    // 좌석 잠금 시간을 최소화하고, 커밋되지 않은 상태가 외부에 노출되지 않도록 한다.
     @Transactional
     override fun hold(command: HoldSeatCommand): HoldSeatResult {
-        val performance =
-            loadPerformanceSalesStatusPort.load(command.performanceId)
-                ?: return HoldSeatResult(
-                    status = HoldSeatResultStatus.NOT_ON_SALE,
-                    performanceSeatId = command.performanceSeatId,
-                )
+        // 1. admission token 검증
+        validateReservationAdmissionPort.validate(
+            ValidateReservationAdmissionCommand(
+                performanceId = command.performanceId,
+                memberId = command.memberId,
+                admissionToken = command.admissionToken,
+            ),
+        )
 
-        if (!performance.isOnSale()) {
-            return HoldSeatResult(
-                status = HoldSeatResultStatus.NOT_ON_SALE,
-                performanceSeatId = command.performanceSeatId,
-            )
-        }
-
+        // 2. idempotency key 기준 기존 reservation 조회
         val existing =
             loadReservationPort.findByIdempotencyKey(
                 performanceId = command.performanceId,
@@ -67,12 +69,26 @@ class ReservationService(
                 status = HoldSeatResultStatus.ALREADY_PROCESSED,
                 reservationId = existing.reservationId,
                 performanceSeatId = existing.performanceSeatId,
-                holdToken = existing.holdToken.takeIf { existing.status == ReservationStatus.HELD },
                 expiresAt = existing.expiresAt,
             )
         }
 
-        val holdToken = "ht_${UUID.randomUUID()}"
+        // 3. performance 판매 상태 확인
+        val performance =
+            loadPerformanceSalesStatusPort.load(command.performanceId)
+                ?: return HoldSeatResult(
+                    status = HoldSeatResultStatus.PERFORMANCE_NOT_FOUND,
+                    performanceSeatId = command.performanceSeatId,
+                )
+
+        if (!performance.isOnSale()) {
+            return HoldSeatResult(
+                status = HoldSeatResultStatus.NOT_ON_SALE,
+                performanceSeatId = performance.performanceId,
+            )
+        }
+
+        // 4. seat hold 시도
         val expiresAt = command.requestedAt.plus(holdTtl)
 
         val holdResult =
@@ -81,7 +97,6 @@ class ReservationService(
                     performanceId = command.performanceId,
                     performanceSeatId = command.performanceSeatId,
                     memberId = command.memberId,
-                    holdToken = holdToken,
                     expiresAt = expiresAt,
                 ),
             )
@@ -93,6 +108,7 @@ class ReservationService(
             )
         }
 
+        // 5. reservation 생성에 필요한 reference 조회
         val references =
             loadReservationReferencesPort.load(
                 LoadReservationReferencesCommand(
@@ -102,18 +118,21 @@ class ReservationService(
                 ),
             ) ?: error("Reservation references were not found after seat hold")
 
+        // 6. reservation 저장
         val reservation =
             Reservation.createHeld(
                 performance = references.performance,
                 performanceSeat = references.performanceSeat,
                 member = references.member,
-                holdToken = holdToken,
                 idempotencyKey = command.idempotencyKey,
                 expiresAt = expiresAt,
             )
 
         val savedReservation = saveReservationPort.save(reservation)
 
+        // TODO: 트랜잭션 내부의 직접 이벤트 발행을 Transactional Outbox 방식으로 대체한다.
+        // 좌석 변경 이벤트는 좌석 선점 트랜잭션이 정상적으로 커밋된 이후에만 발행되어야 한다.
+        // 7. seat changed event publish
         publishSeatChangePort.publishSeatHeld(
             SeatHeldEvent(
                 performanceId = command.performanceId,
@@ -126,7 +145,6 @@ class ReservationService(
             status = HoldSeatResultStatus.HELD,
             reservationId = savedReservation.reservationId,
             performanceSeatId = command.performanceSeatId,
-            holdToken = holdToken,
             expiresAt = expiresAt,
         )
     }
