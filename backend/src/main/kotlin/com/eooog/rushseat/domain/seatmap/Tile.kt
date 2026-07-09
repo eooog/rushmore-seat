@@ -16,13 +16,14 @@ import org.hibernate.annotations.Check
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_tile_seat_map_code",
-            columnNames = ["seat_map_id", "code"]
-        )
-    ]
+            columnNames = ["seat_map_id", "code"],
+        ),
+    ],
 )
-@Check(constraints = "row_start_no > 0 and row_end_no >= row_start_no and col_start_no > 0 and col_end_no >= col_start_no and seat_count >= 0")
+@Check(
+    constraints = "row_start_no > 0 and row_end_no >= row_start_no and col_start_no > 0 and col_end_no >= col_start_no and seat_count >= 0",
+)
 class Tile protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "seat_map_id", nullable = false)
     lateinit var seatMap: SeatMap
@@ -65,7 +66,12 @@ class Tile protected constructor() : AuditableEntity() {
         this.name = validateName(name)
     }
 
-    fun changeRange(rowStartNo: Int, rowEndNo: Int, colStartNo: Int, colEndNo: Int) {
+    fun changeRange(
+        rowStartNo: Int,
+        rowEndNo: Int,
+        colStartNo: Int,
+        colEndNo: Int,
+    ) {
         validateRange(rowStartNo, rowEndNo, colStartNo, colEndNo)
         this.rowStartNo = rowStartNo
         this.rowEndNo = rowEndNo
@@ -73,9 +79,10 @@ class Tile protected constructor() : AuditableEntity() {
         this.colEndNo = colEndNo
     }
 
-    fun containsPosition(rowNo: Int, colNo: Int): Boolean {
-        return rowNo in rowStartNo..rowEndNo && colNo in colStartNo..colEndNo
-    }
+    fun containsPosition(
+        rowNo: Int,
+        colNo: Int,
+    ): Boolean = rowNo in rowStartNo..rowEndNo && colNo in colStartNo..colEndNo
 
     fun changeSeatCount(seatCount: Int) {
         this.seatCount = validateSeatCount(seatCount)
@@ -130,7 +137,12 @@ class Tile protected constructor() : AuditableEntity() {
             return normalized
         }
 
-        private fun validateRange(rowStartNo: Int, rowEndNo: Int, colStartNo: Int, colEndNo: Int) {
+        private fun validateRange(
+            rowStartNo: Int,
+            rowEndNo: Int,
+            colStartNo: Int,
+            colEndNo: Int,
+        ) {
             require(rowStartNo > 0) { "타일 시작 행 번호는 0보다 커야 합니다" }
             require(rowEndNo >= rowStartNo) { "타일 종료 행 번호는 시작 행 번호보다 작을 수 없습니다" }
             require(colStartNo > 0) { "타일 시작 열 번호는 0보다 커야 합니다" }

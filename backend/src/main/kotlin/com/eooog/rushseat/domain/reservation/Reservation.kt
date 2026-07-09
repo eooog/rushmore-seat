@@ -21,12 +21,11 @@ import java.time.Instant
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_reservation_idempotency",
-            columnNames = ["performance_id", "member_id", "idempotency_key"]
-        )
-    ]
+            columnNames = ["performance_id", "member_id", "idempotency_key"],
+        ),
+    ],
 )
 class Reservation protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "performance_id", nullable = false)
     lateinit var performance: Performance
@@ -87,9 +86,7 @@ class Reservation protected constructor() : AuditableEntity() {
         this.status = ReservationStatus.CANCELLED
     }
 
-    fun isExpired(now: Instant): Boolean {
-        return expiresAt != null && !expiresAt!!.isAfter(now)
-    }
+    fun isExpired(now: Instant): Boolean = expiresAt != null && !expiresAt!!.isAfter(now)
 
     fun assertHeld() {
         check(status == ReservationStatus.HELD) {

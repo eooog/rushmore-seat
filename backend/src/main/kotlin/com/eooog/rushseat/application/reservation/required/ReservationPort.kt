@@ -19,9 +19,7 @@ data class PerformanceSalesStatusSnapshot(
     val status: PerformanceStatus,
     val salesStatus: PerformanceSalesStatus,
 ) {
-    fun isOnSale(): Boolean {
-        return status == PerformanceStatus.SCHEDULED && salesStatus == PerformanceSalesStatus.ON_SALE
-    }
+    fun isOnSale(): Boolean = status == PerformanceStatus.SCHEDULED && salesStatus == PerformanceSalesStatus.ON_SALE
 }
 
 interface LoadReservationPort {
@@ -123,6 +121,7 @@ data class ConfirmReservationRecordResult(
 
 interface PublishSeatChangePort {
     fun publishSeatHeld(event: SeatHeldEvent)
+
     fun publishSeatReserved(event: SeatReservedEvent)
 }
 

@@ -10,7 +10,6 @@ import jakarta.persistence.Table
     name = "venue",
 )
 class Venue protected constructor() : AuditableEntity() {
-
     @field:Column(name = "name", nullable = false, length = 200)
     lateinit var name: String
         protected set
@@ -27,12 +26,11 @@ class Venue protected constructor() : AuditableEntity() {
         fun create(
             name: String,
             address: String? = null,
-        ): Venue {
-            return Venue().apply {
+        ): Venue =
+            Venue().apply {
                 this.name = validateName(name)
                 this.address = normalizeAddress(address)
             }
-        }
 
         private fun validateName(name: String): String {
             val normalized = name.trim()

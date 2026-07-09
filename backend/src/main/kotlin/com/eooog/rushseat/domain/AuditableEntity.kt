@@ -11,7 +11,6 @@ import java.time.Instant
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener::class)
 abstract class AuditableEntity : BaseEntity() {
-
     @field:CreatedDate
     @field:Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: Instant? = null
@@ -21,5 +20,4 @@ abstract class AuditableEntity : BaseEntity() {
     @field:Column(name = "updated_at", nullable = false)
     var updatedAt: Instant? = null
         protected set
-
 }

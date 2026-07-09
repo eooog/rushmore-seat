@@ -1,4 +1,4 @@
-package com.eooog.rushseat.adapter.inbound.queue.web
+package com.eooog.rushseat.adapter.inbound.web.queue
 
 import com.eooog.rushseat.application.queue.AdmitQueueCommand
 import com.eooog.rushseat.application.queue.AdmitQueueResult
@@ -25,47 +25,43 @@ class QueueController(
     private val getQueueStatusUseCase: GetQueueStatusUseCase,
     private val admitQueueUseCase: AdmitQueueUseCase,
 ) {
-
     @PostMapping("/performances/{performanceId}/queue")
     fun enter(
         @PathVariable performanceId: Long,
         @Valid @RequestBody request: QueueEnterRequest,
-    ): QueueEnterResult {
-        return enterQueueUseCase.enter(
+    ): QueueEnterResult =
+        enterQueueUseCase.enter(
             EnterQueueCommand(
                 performanceId = performanceId,
                 memberId = request.memberId,
                 requestedAt = Instant.now(),
-            )
+            ),
         )
-    }
 
     @GetMapping("/performances/{performanceId}/queue/me")
     fun me(
         @PathVariable performanceId: Long,
         @RequestParam queueToken: String,
-    ): QueueStatusResult {
-        return getQueueStatusUseCase.getStatus(
+    ): QueueStatusResult =
+        getQueueStatusUseCase.getStatus(
             GetQueueStatusQuery(
                 performanceId = performanceId,
                 queueToken = queueToken,
-            )
+            ),
         )
-    }
 
     @PostMapping("/internal/performances/{performanceId}/admissions")
     fun admit(
         @PathVariable performanceId: Long,
         @RequestParam(defaultValue = "100") limit: Int,
-    ): AdmitQueueResult {
-        return admitQueueUseCase.admit(
+    ): AdmitQueueResult =
+        admitQueueUseCase.admit(
             AdmitQueueCommand(
                 performanceId = performanceId,
                 limit = limit,
                 requestedAt = Instant.now(),
-            )
+            ),
         )
-    }
 }
 
 data class QueueEnterRequest(

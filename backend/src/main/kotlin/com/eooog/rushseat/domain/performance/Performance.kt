@@ -19,7 +19,6 @@ import java.time.Instant
 @Table(name = "performance")
 @Check(constraints = "starts_at < ends_at and sales_open_at < sales_close_at")
 class Performance protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "show_id", nullable = false)
     lateinit var show: Show
@@ -61,14 +60,20 @@ class Performance protected constructor() : AuditableEntity() {
     var salesStatus: PerformanceSalesStatus = PerformanceSalesStatus.BEFORE_SALE
         protected set
 
-    fun reschedule(startsAt: Instant, endsAt: Instant) {
+    fun reschedule(
+        startsAt: Instant,
+        endsAt: Instant,
+    ) {
         assertEditable()
         validatePerformanceTime(startsAt, endsAt)
         this.startsAt = startsAt
         this.endsAt = endsAt
     }
 
-    fun changeSalesPeriod(salesOpenAt: Instant, salesCloseAt: Instant) {
+    fun changeSalesPeriod(
+        salesOpenAt: Instant,
+        salesCloseAt: Instant,
+    ) {
         assertEditable()
         validateSalesPeriod(salesOpenAt, salesCloseAt)
         this.salesOpenAt = salesOpenAt
@@ -159,13 +164,19 @@ class Performance protected constructor() : AuditableEntity() {
             }
         }
 
-        private fun validatePerformanceTime(startsAt: Instant, endsAt: Instant) {
+        private fun validatePerformanceTime(
+            startsAt: Instant,
+            endsAt: Instant,
+        ) {
             require(startsAt <= endsAt) {
                 "공연 종료 시각은 시작 시각보다 이후여야 합니다"
             }
         }
 
-        private fun validateSalesPeriod(salesOpenAt: Instant, salesCloseAt: Instant) {
+        private fun validateSalesPeriod(
+            salesOpenAt: Instant,
+            salesCloseAt: Instant,
+        ) {
             require(salesOpenAt <= salesCloseAt) {
                 "예매 종료 시각은 예매 시작 시각보다 이후여야 합니다"
             }

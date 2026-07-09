@@ -13,7 +13,6 @@ import java.time.Instant
 class RedisQueueAdapter(
     private val redis: StringRedisTemplate,
 ) : QueueStatePort {
-
     override fun addWaitingMember(
         performanceId: Long,
         memberId: Long,
@@ -29,19 +28,17 @@ class RedisQueueAdapter(
     override fun getWaitingRank(
         performanceId: Long,
         memberId: Long,
-    ): Long? {
-        return redis.opsForZSet().rank(waitingKey(performanceId), memberId.toString())
-    }
+    ): Long? = redis.opsForZSet().rank(waitingKey(performanceId), memberId.toString())
 
     override fun popWaitingMembers(
         performanceId: Long,
         limit: Int,
-    ): List<Long> {
-        return redis.opsForZSet()
+    ): List<Long> =
+        redis
+            .opsForZSet()
             .popMin(waitingKey(performanceId), limit.toLong())
             .orEmpty()
             .mapNotNull { it.value?.toLongOrNull() }
-    }
 
     override fun saveQueueToken(
         token: QueueTokenRecord,
@@ -89,9 +86,7 @@ class RedisQueueAdapter(
     override fun findMemberQueueToken(
         performanceId: Long,
         memberId: Long,
-    ): String? {
-        return redis.opsForValue().get(memberQueueTokenKey(performanceId, memberId))
-    }
+    ): String? = redis.opsForValue().get(memberQueueTokenKey(performanceId, memberId))
 
     override fun markQueueTokenAdmitted(
         queueToken: String,
@@ -148,7 +143,13 @@ class RedisQueueAdapter(
     }
 
     private fun waitingKey(performanceId: Long): String = "queue:waiting:$performanceId"
+
     private fun queueTokenKey(queueToken: String): String = "queue:token:$queueToken"
-    private fun memberQueueTokenKey(performanceId: Long, memberId: Long): String = "queue:member-token:$performanceId:$memberId"
+
+    private fun memberQueueTokenKey(
+        performanceId: Long,
+        memberId: Long,
+    ): String = "queue:member-token:$performanceId:$memberId"
+
     private fun admissionTokenKey(admissionToken: String): String = "admission:token:$admissionToken"
 }

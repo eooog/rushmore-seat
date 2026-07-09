@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
-
     @Query(
         """
         SELECT r
@@ -17,7 +16,7 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
         WHERE r.performance.id = :performanceId
           AND r.member.id = :memberId
           AND r.idempotencyKey = :idempotencyKey
-        """
+        """,
     )
     fun findByIdempotencyKey(
         @Param("performanceId") performanceId: Long,
@@ -35,7 +34,7 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
         WHERE r.performance.id = :performanceId
           AND r.member.id = :memberId
           AND r.holdToken = :holdToken
-        """
+        """,
     )
     fun findByHoldToken(
         @Param("performanceId") performanceId: Long,

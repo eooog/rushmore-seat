@@ -19,13 +19,12 @@ import org.hibernate.annotations.Check
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_seat_map_hall_version",
-            columnNames = ["hall_id", "version"]
-        )
-    ]
+            columnNames = ["hall_id", "version"],
+        ),
+    ],
 )
 @Check(constraints = "version > 0")
 class SeatMap protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "hall_id", nullable = false)
     lateinit var hall: Hall
@@ -62,9 +61,7 @@ class SeatMap protected constructor() : AuditableEntity() {
         }
     }
 
-    fun isActive(): Boolean {
-        return status == SeatMapStatus.ACTIVE
-    }
+    fun isActive(): Boolean = status == SeatMapStatus.ACTIVE
 
     companion object {
         fun create(
@@ -72,14 +69,13 @@ class SeatMap protected constructor() : AuditableEntity() {
             name: String,
             version: Int,
             status: SeatMapStatus = SeatMapStatus.ACTIVE,
-        ): SeatMap {
-            return SeatMap().apply {
+        ): SeatMap =
+            SeatMap().apply {
                 this.hall = hall
                 this.name = validateName(name)
                 this.version = validateVersion(version)
                 this.status = status
             }
-        }
 
         private fun validateName(name: String): String {
             val normalized = name.trim()

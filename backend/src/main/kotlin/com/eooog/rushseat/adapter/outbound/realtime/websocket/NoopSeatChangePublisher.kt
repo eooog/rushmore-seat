@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component
 
 @Component
 class NoopSeatChangePublisher : PublishSeatChangePort {
-
     override fun publishSeatHeld(event: SeatHeldEvent) {
         // WebSocket publisher will be connected after the performance_seat API migration.
     }

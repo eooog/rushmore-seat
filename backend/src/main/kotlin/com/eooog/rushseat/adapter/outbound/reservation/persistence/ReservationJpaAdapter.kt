@@ -30,10 +30,10 @@ class ReservationJpaAdapter(
     LoadReservationReferencesPort,
     SaveReservationPort,
     ConfirmReservationPort {
-
     override fun load(performanceId: Long): PerformanceSalesStatusSnapshot? {
-        val projection = performanceRepository.findSalesStatus(performanceId)
-            ?: return null
+        val projection =
+            performanceRepository.findSalesStatus(performanceId)
+                ?: return null
 
         return PerformanceSalesStatusSnapshot(
             performanceId = projection.performanceId,
@@ -46,33 +46,36 @@ class ReservationJpaAdapter(
         performanceId: Long,
         memberId: Long,
         idempotencyKey: String,
-    ): ReservationSnapshot? {
-        return reservationRepository.findByIdempotencyKey(
-            performanceId = performanceId,
-            memberId = memberId,
-            idempotencyKey = idempotencyKey,
-        )?.toSnapshot()
-    }
+    ): ReservationSnapshot? =
+        reservationRepository
+            .findByIdempotencyKey(
+                performanceId = performanceId,
+                memberId = memberId,
+                idempotencyKey = idempotencyKey,
+            )?.toSnapshot()
 
     override fun findByHoldToken(
         performanceId: Long,
         memberId: Long,
         holdToken: String,
-    ): ReservationSnapshot? {
-        return reservationRepository.findByHoldToken(
-            performanceId = performanceId,
-            memberId = memberId,
-            holdToken = holdToken,
-        )?.toSnapshot()
-    }
+    ): ReservationSnapshot? =
+        reservationRepository
+            .findByHoldToken(
+                performanceId = performanceId,
+                memberId = memberId,
+                holdToken = holdToken,
+            )?.toSnapshot()
 
     override fun load(command: LoadReservationReferencesCommand): ReservationReferences? {
-        val performance = entityManager.find(Performance::class.java, command.performanceId)
-            ?: return null
-        val performanceSeat = entityManager.find(PerformanceSeat::class.java, command.performanceSeatId)
-            ?: return null
-        val member = entityManager.find(Member::class.java, command.memberId)
-            ?: return null
+        val performance =
+            entityManager.find(Performance::class.java, command.performanceId)
+                ?: return null
+        val performanceSeat =
+            entityManager.find(PerformanceSeat::class.java, command.performanceSeatId)
+                ?: return null
+        val member =
+            entityManager.find(Member::class.java, command.memberId)
+                ?: return null
 
         return ReservationReferences(
             performance = performance,
@@ -89,11 +92,12 @@ class ReservationJpaAdapter(
     }
 
     override fun confirm(command: ConfirmReservationRecordCommand): ConfirmReservationRecordResult {
-        val reservation = reservationRepository.findByHoldToken(
-            performanceId = command.performanceId,
-            memberId = command.memberId,
-            holdToken = command.holdToken,
-        ) ?: return ConfirmReservationRecordResult(reservationId = null)
+        val reservation =
+            reservationRepository.findByHoldToken(
+                performanceId = command.performanceId,
+                memberId = command.memberId,
+                holdToken = command.holdToken,
+            ) ?: return ConfirmReservationRecordResult(reservationId = null)
 
         if (reservation.isExpired(command.confirmedAt)) {
             return ConfirmReservationRecordResult(reservationId = null)
@@ -105,8 +109,8 @@ class ReservationJpaAdapter(
         )
     }
 
-    private fun Reservation.toSnapshot(): ReservationSnapshot {
-        return ReservationSnapshot(
+    private fun Reservation.toSnapshot(): ReservationSnapshot =
+        ReservationSnapshot(
             reservationId = id ?: error("Reservation id is null"),
             performanceId = performance.id ?: error("Performance id is null"),
             performanceSeatId = performanceSeat.id ?: error("Performance seat id is null"),
@@ -115,5 +119,4 @@ class ReservationJpaAdapter(
             holdToken = holdToken,
             expiresAt = expiresAt,
         )
-    }
 }

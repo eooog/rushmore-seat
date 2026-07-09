@@ -3,21 +3,22 @@ ALTER TABLE performance
 
 UPDATE performance
 SET sales_status = CASE status
-    WHEN 'ON_SALE' THEN 'ON_SALE'
-    WHEN 'SALES_CLOSED' THEN 'CLOSED'
-    WHEN 'CANCELLED' THEN 'CLOSED'
-    ELSE 'BEFORE_SALE'
-END;
+                       WHEN 'ON_SALE' THEN 'ON_SALE'
+                       WHEN 'SALES_CLOSED' THEN 'CLOSED'
+                       WHEN 'CANCELLED' THEN 'CLOSED'
+                       ELSE 'BEFORE_SALE'
+    END;
 
 UPDATE performance
 SET status = CASE status
-    WHEN 'CANCELLED' THEN 'CANCELLED'
-    ELSE 'SCHEDULED'
-END;
+                 WHEN 'CANCELLED' THEN 'CANCELLED'
+                 ELSE 'SCHEDULED'
+    END;
 
 ALTER TABLE performance
     ALTER COLUMN sales_status DROP DEFAULT,
-    DROP CONSTRAINT ck_performance_status,
+DROP
+CONSTRAINT ck_performance_status,
     ADD CONSTRAINT ck_performance_status CHECK (status IN ('SCHEDULED', 'CANCELLED')),
     ADD CONSTRAINT ck_performance_sales_status CHECK (sales_status IN ('BEFORE_SALE', 'ON_SALE', 'CLOSED'));
 
@@ -29,5 +30,6 @@ ALTER TABLE performance_seat
     RENAME COLUMN hold_owner_id TO hold_member_id;
 
 ALTER TABLE performance_seat
-    DROP CONSTRAINT ck_performance_seat_status,
+DROP
+CONSTRAINT ck_performance_seat_status,
     ADD CONSTRAINT ck_performance_seat_status CHECK (status IN ('AVAILABLE', 'HELD', 'RESERVED'));

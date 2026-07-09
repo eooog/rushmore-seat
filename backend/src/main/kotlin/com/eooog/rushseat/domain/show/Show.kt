@@ -10,7 +10,6 @@ import org.hibernate.annotations.Check
 @Table(name = "show_info")
 @Check(constraints = "running_minutes is null or running_minutes > 0")
 class Show protected constructor() : AuditableEntity() {
-
     @field:Column(name = "title", nullable = false, length = 300)
     lateinit var title: String
         protected set
@@ -44,13 +43,12 @@ class Show protected constructor() : AuditableEntity() {
             title: String,
             description: String? = null,
             runningMinutes: Int? = null,
-        ): Show {
-            return Show().apply {
+        ): Show =
+            Show().apply {
                 this.title = validateTitle(title)
                 this.description = normalizeDescription(description)
                 this.runningMinutes = validateRunningMinutes(runningMinutes)
             }
-        }
 
         private fun validateTitle(title: String): String {
             val normalized = title.trim()
