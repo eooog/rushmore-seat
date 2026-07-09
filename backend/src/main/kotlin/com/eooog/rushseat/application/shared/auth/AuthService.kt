@@ -14,7 +14,6 @@ class AuthService(
     @Value("\${rushmore-seat.auth.access-token-ttl:600s}") private val accessTokenTtl: Duration,
 ) : IssueAccessTokenUseCase,
     AccessTokenVerifier {
-
     override fun issue(command: IssueAccessTokenCommand): IssueAccessTokenResult {
         require(command.memberId > 0) {
             "memberId must be positive"
@@ -35,8 +34,9 @@ class AuthService(
     }
 
     override fun verify(token: AccessToken): MemberPrincipal? {
-        val memberId = accessTokenStorePort.findMemberId(token)
-            ?: return null
+        val memberId =
+            accessTokenStorePort.findMemberId(token)
+                ?: return null
 
         return MemberPrincipal(memberId = memberId)
     }

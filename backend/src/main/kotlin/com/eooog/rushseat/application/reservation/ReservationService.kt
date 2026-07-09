@@ -35,17 +35,18 @@ class ReservationService(
     private val confirmReservationPort: ConfirmReservationPort,
     private val publishSeatChangePort: PublishSeatChangePort,
     @Value("\${rushmore-seat.hold.ttl-seconds}") holdTtlSeconds: Long,
-) : HoldSeatUseCase, ConfirmReservationUseCase {
-
+) : HoldSeatUseCase,
+    ConfirmReservationUseCase {
     private val holdTtl: Duration = Duration.ofSeconds(holdTtlSeconds)
 
     @Transactional
     override fun hold(command: HoldSeatCommand): HoldSeatResult {
-        val performance = loadPerformanceSalesStatusPort.load(command.performanceId)
-            ?: return HoldSeatResult(
-                status = HoldSeatResultStatus.NOT_ON_SALE,
-                performanceSeatId = command.performanceSeatId,
-            )
+        val performance =
+            loadPerformanceSalesStatusPort.load(command.performanceId)
+                ?: return HoldSeatResult(
+                    status = HoldSeatResultStatus.NOT_ON_SALE,
+                    performanceSeatId = command.performanceSeatId,
+                )
 
         if (!performance.isOnSale()) {
             return HoldSeatResult(
@@ -54,11 +55,12 @@ class ReservationService(
             )
         }
 
-        val existing = loadReservationPort.findByIdempotencyKey(
-            performanceId = command.performanceId,
-            memberId = command.memberId,
-            idempotencyKey = command.idempotencyKey,
-        )
+        val existing =
+            loadReservationPort.findByIdempotencyKey(
+                performanceId = command.performanceId,
+                memberId = command.memberId,
+                idempotencyKey = command.idempotencyKey,
+            )
 
         if (existing != null) {
             return HoldSeatResult(
@@ -73,15 +75,16 @@ class ReservationService(
         val holdToken = "ht_${UUID.randomUUID()}"
         val expiresAt = command.requestedAt.plus(holdTtl)
 
-        val holdResult = holdPerformanceSeatPort.hold(
-            HoldPerformanceSeatCommand(
-                performanceId = command.performanceId,
-                performanceSeatId = command.performanceSeatId,
-                memberId = command.memberId,
-                holdToken = holdToken,
-                expiresAt = expiresAt,
+        val holdResult =
+            holdPerformanceSeatPort.hold(
+                HoldPerformanceSeatCommand(
+                    performanceId = command.performanceId,
+                    performanceSeatId = command.performanceSeatId,
+                    memberId = command.memberId,
+                    holdToken = holdToken,
+                    expiresAt = expiresAt,
+                ),
             )
-        )
 
         if (!holdResult.held) {
             return HoldSeatResult(
@@ -90,22 +93,24 @@ class ReservationService(
             )
         }
 
-        val references = loadReservationReferencesPort.load(
-            LoadReservationReferencesCommand(
-                performanceId = command.performanceId,
-                performanceSeatId = command.performanceSeatId,
-                memberId = command.memberId,
-            )
-        ) ?: error("Reservation references were not found after seat hold")
+        val references =
+            loadReservationReferencesPort.load(
+                LoadReservationReferencesCommand(
+                    performanceId = command.performanceId,
+                    performanceSeatId = command.performanceSeatId,
+                    memberId = command.memberId,
+                ),
+            ) ?: error("Reservation references were not found after seat hold")
 
-        val reservation = Reservation.createHeld(
-            performance = references.performance,
-            performanceSeat = references.performanceSeat,
-            member = references.member,
-            holdToken = holdToken,
-            idempotencyKey = command.idempotencyKey,
-            expiresAt = expiresAt,
-        )
+        val reservation =
+            Reservation.createHeld(
+                performance = references.performance,
+                performanceSeat = references.performanceSeat,
+                member = references.member,
+                holdToken = holdToken,
+                idempotencyKey = command.idempotencyKey,
+                expiresAt = expiresAt,
+            )
 
         val savedReservation = saveReservationPort.save(reservation)
 
@@ -114,7 +119,7 @@ class ReservationService(
                 performanceId = command.performanceId,
                 performanceSeatId = command.performanceSeatId,
                 holdExpiresAt = expiresAt,
-            )
+            ),
         )
 
         return HoldSeatResult(
@@ -128,14 +133,15 @@ class ReservationService(
 
     @Transactional
     override fun confirm(command: ConfirmReservationCommand): ConfirmReservationResult {
-        val seatResult = confirmPerformanceSeatPort.confirm(
-            ConfirmPerformanceSeatCommand(
-                performanceId = command.performanceId,
-                memberId = command.memberId,
-                holdToken = command.holdToken,
-                requestedAt = command.requestedAt,
+        val seatResult =
+            confirmPerformanceSeatPort.confirm(
+                ConfirmPerformanceSeatCommand(
+                    performanceId = command.performanceId,
+                    memberId = command.memberId,
+                    holdToken = command.holdToken,
+                    requestedAt = command.requestedAt,
+                ),
             )
-        )
 
         if (!seatResult.confirmed || seatResult.performanceSeatId == null) {
             return ConfirmReservationResult(
@@ -143,14 +149,15 @@ class ReservationService(
             )
         }
 
-        val reservationResult = confirmReservationPort.confirm(
-            ConfirmReservationRecordCommand(
-                performanceId = command.performanceId,
-                memberId = command.memberId,
-                holdToken = command.holdToken,
-                confirmedAt = command.requestedAt,
+        val reservationResult =
+            confirmReservationPort.confirm(
+                ConfirmReservationRecordCommand(
+                    performanceId = command.performanceId,
+                    memberId = command.memberId,
+                    holdToken = command.holdToken,
+                    confirmedAt = command.requestedAt,
+                ),
             )
-        )
 
         check(reservationResult.reservationId != null) {
             "Reservation record was not confirmed after seat confirmation"
@@ -160,7 +167,7 @@ class ReservationService(
             SeatReservedEvent(
                 performanceId = command.performanceId,
                 performanceSeatId = seatResult.performanceSeatId,
-            )
+            ),
         )
 
         return ConfirmReservationResult(

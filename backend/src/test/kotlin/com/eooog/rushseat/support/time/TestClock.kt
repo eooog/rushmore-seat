@@ -1,6 +1,10 @@
 package com.eooog.rushseat.support.time
 
-import java.time.*
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicReference
 
 class TestClock private constructor(
@@ -8,7 +12,6 @@ class TestClock private constructor(
     private val currentInstant: AtomicReference<Instant>,
     private val zoneId: ZoneId,
 ) : Clock() {
-
     constructor(
         initialInstant: Instant,
         zoneId: ZoneId = ZoneOffset.UTC,
@@ -18,21 +21,16 @@ class TestClock private constructor(
         zoneId = zoneId,
     )
 
-    override fun getZone(): ZoneId {
-        return zoneId
-    }
+    override fun getZone(): ZoneId = zoneId
 
-    override fun withZone(zone: ZoneId): Clock {
-        return TestClock(
+    override fun withZone(zone: ZoneId): Clock =
+        TestClock(
             initialInstant = initialInstant,
             currentInstant = currentInstant,
             zoneId = zone,
         )
-    }
 
-    override fun instant(): Instant {
-        return currentInstant.get()
-    }
+    override fun instant(): Instant = currentInstant.get()
 
     fun reset() {
         currentInstant.set(initialInstant)

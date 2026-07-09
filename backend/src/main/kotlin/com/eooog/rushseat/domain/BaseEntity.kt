@@ -9,7 +9,6 @@ import org.hibernate.proxy.HibernateProxy
 
 @MappedSuperclass
 abstract class BaseEntity {
-
     @field:Id
     @field:GeneratedValue(strategy = GenerationType.IDENTITY)
     @field:Column(name = "id", nullable = false, updatable = false)
@@ -27,15 +26,12 @@ abstract class BaseEntity {
         return id != null && id == other.id
     }
 
-    override fun hashCode(): Int {
-        return effectiveClass(this).hashCode()
-    }
+    override fun hashCode(): Int = effectiveClass(this).hashCode()
 
-    private fun effectiveClass(target: Any): Class<*> {
-        return if (target is HibernateProxy) {
+    private fun effectiveClass(target: Any): Class<*> =
+        if (target is HibernateProxy) {
             target.hibernateLazyInitializer.persistentClass
         } else {
             target.javaClass
         }
-    }
 }

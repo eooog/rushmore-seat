@@ -7,28 +7,25 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
-
 @Configuration
 class SecurityConfig(
     private val accessTokenAuthenticationFilter: AccessTokenAuthenticationFilter,
 ) {
-
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .sessionManagement {
                 it.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            }
-            .authorizeHttpRequests {
+            }.authorizeHttpRequests {
                 it
                     .requestMatchers(
                         "/internal/**",
                         "/actuator/**",
                     ).permitAll()
-                    .anyRequest().authenticated()
-            }
-            .addFilterBefore(
+                    .anyRequest()
+                    .authenticated()
+            }.addFilterBefore(
                 accessTokenAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter::class.java,
             )

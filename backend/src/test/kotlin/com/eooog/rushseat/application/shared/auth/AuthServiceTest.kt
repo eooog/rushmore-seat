@@ -12,7 +12,6 @@ import java.time.Duration
 
 @SpringJUnitConfig(AuthTestConfig::class)
 class AuthServiceTest {
-
     @Autowired
     lateinit var authService: AuthService
 
@@ -33,9 +32,10 @@ class AuthServiceTest {
 
     @Test
     fun `issue() should return issued token and memberId`() {
-        val issueResult = authService.issue(
-            IssueAccessTokenCommand(memberId = memberId),
-        )
+        val issueResult =
+            authService.issue(
+                IssueAccessTokenCommand(memberId = memberId),
+            )
 
         assertThat(issueResult.accessToken).isNotNull
         assertThat(issueResult.accessToken.value).startsWith("acc_")
@@ -49,23 +49,22 @@ class AuthServiceTest {
                 authService.issue(
                     IssueAccessTokenCommand(memberId = 0L),
                 )
-            }
-            .withMessage("memberId must be positive")
+            }.withMessage("memberId must be positive")
 
         assertThatIllegalArgumentException()
             .isThrownBy {
                 authService.issue(
                     IssueAccessTokenCommand(memberId = -1L),
                 )
-            }
-            .withMessage("memberId must be positive")
+            }.withMessage("memberId must be positive")
     }
 
     @Test
     fun `verify() should return principal when token exists and not expired`() {
-        val issueResult = authService.issue(
-            IssueAccessTokenCommand(memberId = memberId),
-        )
+        val issueResult =
+            authService.issue(
+                IssueAccessTokenCommand(memberId = memberId),
+            )
 
         val principal = authService.verify(issueResult.accessToken)
 
@@ -75,12 +74,12 @@ class AuthServiceTest {
 
     @Test
     fun `verify() should return null when token does not exist`() {
-
         val tokenBody = "a".repeat(43)
 
-        val unknownToken = AccessToken.parse(
-            "acc_$tokenBody",
-        )
+        val unknownToken =
+            AccessToken.parse(
+                "acc_$tokenBody",
+            )
 
         val principal = authService.verify(unknownToken)
 
@@ -89,9 +88,10 @@ class AuthServiceTest {
 
     @Test
     fun `verify() should return principal before expiration boundary`() {
-        val issueResult = authService.issue(
-            IssueAccessTokenCommand(memberId = memberId),
-        )
+        val issueResult =
+            authService.issue(
+                IssueAccessTokenCommand(memberId = memberId),
+            )
 
         clock.advance(accessTokenTtl.minusNanos(1))
 
@@ -103,9 +103,10 @@ class AuthServiceTest {
 
     @Test
     fun `verify() should return null at expiration boundary`() {
-        val issueResult = authService.issue(
-            IssueAccessTokenCommand(memberId = memberId),
-        )
+        val issueResult =
+            authService.issue(
+                IssueAccessTokenCommand(memberId = memberId),
+            )
 
         clock.advance(accessTokenTtl)
 
@@ -113,5 +114,4 @@ class AuthServiceTest {
 
         assertThat(principal).isNull()
     }
-
 }

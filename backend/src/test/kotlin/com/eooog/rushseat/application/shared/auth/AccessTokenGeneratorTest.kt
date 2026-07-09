@@ -6,14 +6,12 @@ import org.junit.jupiter.api.Test
 import java.util.Base64
 
 class AccessTokenGeneratorTest {
-
     private val tokenGenerator = AccessTokenGenerator()
 
     private val prefix = "acc"
 
     @Test
     fun `generated token has acc prefix and valid base64url payload`() {
-
         val token = tokenGenerator.generate()
 
         assertThat(token).isNotNull()
@@ -42,7 +40,6 @@ class AccessTokenGeneratorTest {
 
     @Test
     fun `generated token should be parsed`() {
-
         val token = tokenGenerator.generate()
 
         val raw = token.value
@@ -54,8 +51,9 @@ class AccessTokenGeneratorTest {
 
     @Test
     fun `generated tokens are not repeated`() {
-        val tokens = (1..100)
-            .map { tokenGenerator.generate().value }
+        val tokens =
+            (1..100)
+                .map { tokenGenerator.generate().value }
 
         assertThat(tokens).doesNotHaveDuplicates()
     }

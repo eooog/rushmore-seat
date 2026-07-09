@@ -19,7 +19,6 @@ import java.time.Duration
 
 @SpringJUnitConfig(RedisAccessTokenStoreAdapterTest.RedisTestConfig::class)
 class RedisAccessTokenStoreAdapterTest {
-
     @Autowired
     lateinit var adapter: RedisAccessTokenStoreAdapter
 
@@ -118,16 +117,15 @@ class RedisAccessTokenStoreAdapterTest {
         throw lastFailure ?: AssertionError("Condition was not satisfied within $timeout")
     }
 
-
     @TestConfiguration(proxyBeanMethods = false)
     class RedisTestConfig {
-
         @Bean(destroyMethod = "destroy")
         fun redisConnectionFactory(): LettuceConnectionFactory {
-            val configuration = RedisStandaloneConfiguration(
-                redisContainer.host,
-                redisContainer.getMappedPort(REDIS_PORT),
-            )
+            val configuration =
+                RedisStandaloneConfiguration(
+                    redisContainer.host,
+                    redisContainer.getMappedPort(REDIS_PORT),
+                )
 
             return LettuceConnectionFactory(configuration).apply {
                 afterPropertiesSet()
@@ -135,32 +133,27 @@ class RedisAccessTokenStoreAdapterTest {
         }
 
         @Bean
-        fun stringRedisTemplate(
-            redisConnectionFactory: RedisConnectionFactory,
-        ): StringRedisTemplate {
-            return StringRedisTemplate(redisConnectionFactory).apply {
+        fun stringRedisTemplate(redisConnectionFactory: RedisConnectionFactory): StringRedisTemplate =
+            StringRedisTemplate(redisConnectionFactory).apply {
                 afterPropertiesSet()
             }
-        }
 
         @Bean
-        fun redisAccessTokenStoreAdapter(
-            redisTemplate: StringRedisTemplate,
-        ): RedisAccessTokenStoreAdapter {
-            return RedisAccessTokenStoreAdapter(redisTemplate)
-        }
+        fun redisAccessTokenStoreAdapter(redisTemplate: StringRedisTemplate): RedisAccessTokenStoreAdapter =
+            RedisAccessTokenStoreAdapter(redisTemplate)
     }
 
     private class RedisTestContainer :
-            GenericContainer<RedisTestContainer>(DockerImageName.parse("redis:7.2-alpine"))
+        GenericContainer<RedisTestContainer>(DockerImageName.parse("redis:7.2-alpine"))
 
     companion object {
         private const val REDIS_PORT = 6379
 
-        private val redisContainer = RedisTestContainer().apply {
-            withExposedPorts(REDIS_PORT)
-            start()
-        }
+        private val redisContainer =
+            RedisTestContainer().apply {
+                withExposedPorts(REDIS_PORT)
+                start()
+            }
 
         @JvmStatic
         @AfterAll
@@ -168,5 +161,4 @@ class RedisAccessTokenStoreAdapterTest {
             redisContainer.stop()
         }
     }
-
 }

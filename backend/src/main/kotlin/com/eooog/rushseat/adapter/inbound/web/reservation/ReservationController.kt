@@ -22,7 +22,6 @@ class ReservationController(
     private val holdSeatUseCase: HoldSeatUseCase,
     private val confirmReservationUseCase: ConfirmReservationUseCase,
 ) {
-
     @PostMapping("/performances/{performanceId}/seats/{performanceSeatId}/hold")
     fun hold(
         @PathVariable performanceId: Long,
@@ -30,16 +29,18 @@ class ReservationController(
         @RequestHeader("Idempotency-Key", required = false) idempotencyKey: String?,
         @RequestBody request: HoldSeatRequest,
     ): HoldSeatResponse {
-        val result = holdSeatUseCase.hold(
-            HoldSeatCommand(
-                performanceId = performanceId,
-                performanceSeatId = performanceSeatId,
-                memberId = request.memberId,
-                idempotencyKey = idempotencyKey ?: request.idempotencyKey
-                    ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required"),
-                requestedAt = Instant.now(),
+        val result =
+            holdSeatUseCase.hold(
+                HoldSeatCommand(
+                    performanceId = performanceId,
+                    performanceSeatId = performanceSeatId,
+                    memberId = request.memberId,
+                    idempotencyKey =
+                        idempotencyKey ?: request.idempotencyKey
+                            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required"),
+                    requestedAt = Instant.now(),
+                ),
             )
-        )
 
         return result.toResponse()
     }
@@ -49,55 +50,65 @@ class ReservationController(
         @PathVariable performanceId: Long,
         @RequestBody request: ConfirmReservationRequest,
     ): ConfirmReservationResponse {
-        val result = confirmReservationUseCase.confirm(
-            ConfirmReservationCommand(
-                performanceId = performanceId,
-                memberId = request.memberId,
-                holdToken = request.holdToken,
-                requestedAt = Instant.now(),
+        val result =
+            confirmReservationUseCase.confirm(
+                ConfirmReservationCommand(
+                    performanceId = performanceId,
+                    memberId = request.memberId,
+                    holdToken = request.holdToken,
+                    requestedAt = Instant.now(),
+                ),
             )
-        )
 
         return result.toResponse()
     }
 
-    private fun HoldSeatResult.toResponse(): HoldSeatResponse {
-        return when (status) {
+    private fun HoldSeatResult.toResponse(): HoldSeatResponse =
+        when (status) {
             HoldSeatResultStatus.HELD,
-            HoldSeatResultStatus.ALREADY_PROCESSED -> HoldSeatResponse(
-                status = status.name,
-                reservationId = reservationId,
-                performanceSeatId = performanceSeatId,
-                holdToken = holdToken,
-                expiresAt = expiresAt,
-            )
+            HoldSeatResultStatus.ALREADY_PROCESSED,
+            -> {
+                HoldSeatResponse(
+                    status = status.name,
+                    reservationId = reservationId,
+                    performanceSeatId = performanceSeatId,
+                    holdToken = holdToken,
+                    expiresAt = expiresAt,
+                )
+            }
 
-            HoldSeatResultStatus.NOT_ON_SALE -> throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Performance is not on sale"
-            )
+            HoldSeatResultStatus.NOT_ON_SALE -> {
+                throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Performance is not on sale",
+                )
+            }
 
-            HoldSeatResultStatus.UNAVAILABLE -> throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Seat is not available"
-            )
+            HoldSeatResultStatus.UNAVAILABLE -> {
+                throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Seat is not available",
+                )
+            }
         }
-    }
 
-    private fun ConfirmReservationResult.toResponse(): ConfirmReservationResponse {
-        return when (status) {
-            ConfirmReservationResultStatus.CONFIRMED -> ConfirmReservationResponse(
-                status = status.name,
-                reservationId = reservationId,
-                performanceSeatId = performanceSeatId,
-            )
+    private fun ConfirmReservationResult.toResponse(): ConfirmReservationResponse =
+        when (status) {
+            ConfirmReservationResultStatus.CONFIRMED -> {
+                ConfirmReservationResponse(
+                    status = status.name,
+                    reservationId = reservationId,
+                    performanceSeatId = performanceSeatId,
+                )
+            }
 
-            ConfirmReservationResultStatus.NOT_CONFIRMABLE -> throw ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Reservation is not confirmable"
-            )
+            ConfirmReservationResultStatus.NOT_CONFIRMABLE -> {
+                throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Reservation is not confirmable",
+                )
+            }
         }
-    }
 }
 
 data class HoldSeatRequest(

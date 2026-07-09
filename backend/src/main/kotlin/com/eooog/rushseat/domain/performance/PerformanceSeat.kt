@@ -23,12 +23,11 @@ import java.time.Instant
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_performance_seat",
-            columnNames = ["performance_id", "seat_id"]
-        )
-    ]
+            columnNames = ["performance_id", "seat_id"],
+        ),
+    ],
 )
 class PerformanceSeat protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "performance_id", nullable = false)
     lateinit var performance: Performance
@@ -76,7 +75,11 @@ class PerformanceSeat protected constructor() : AuditableEntity() {
     var version: Long = 0
         protected set
 
-    fun hold(member: Member, token: String, expiresAt: Instant) {
+    fun hold(
+        member: Member,
+        token: String,
+        expiresAt: Instant,
+    ) {
         check(status == PerformanceSeatStatus.AVAILABLE) {
             "선택 가능한 좌석만 선점할 수 있습니다"
         }

@@ -16,13 +16,12 @@ import org.hibernate.annotations.Check
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_seat_seat_map_code",
-            columnNames = ["seat_map_id", "code"]
-        )
-    ]
+            columnNames = ["seat_map_id", "code"],
+        ),
+    ],
 )
 @Check(constraints = "row_no > 0 and col_no > 0")
 class Seat protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "seat_map_id", nullable = false)
     lateinit var seatMap: SeatMap
@@ -58,7 +57,10 @@ class Seat protected constructor() : AuditableEntity() {
     var colNo: Int = 0
         protected set
 
-    fun moveTo(rowNo: Int, colNo: Int) {
+    fun moveTo(
+        rowNo: Int,
+        colNo: Int,
+    ) {
         val validatedRowNo = validateNo("rowNo", rowNo)
         val validatedColNo = validateNo("colNo", colNo)
 
@@ -70,7 +72,10 @@ class Seat protected constructor() : AuditableEntity() {
         this.colNo = validatedColNo
     }
 
-    fun changeDisplayLabel(rowLabel: String?, colLabel: String?) {
+    fun changeDisplayLabel(
+        rowLabel: String?,
+        colLabel: String?,
+    ) {
         this.rowLabel = normalizeNullableText("좌석 행", rowLabel, 50)
         this.colLabel = normalizeNullableText("좌석 열", colLabel, 50)
     }
@@ -124,7 +129,11 @@ class Seat protected constructor() : AuditableEntity() {
             return normalized
         }
 
-        private fun normalizeNullableText(label: String, value: String?, maxLength: Int): String? {
+        private fun normalizeNullableText(
+            label: String,
+            value: String?,
+            maxLength: Int,
+        ): String? {
             val normalized = value?.trim()
 
             if (normalized.isNullOrBlank()) {
@@ -138,7 +147,10 @@ class Seat protected constructor() : AuditableEntity() {
             return normalized
         }
 
-        private fun validateNo(name: String, value: Int): Int {
+        private fun validateNo(
+            name: String,
+            value: Int,
+        ): Int {
             require(value > 0) {
                 "$name 값은 0보다 커야 합니다"
             }

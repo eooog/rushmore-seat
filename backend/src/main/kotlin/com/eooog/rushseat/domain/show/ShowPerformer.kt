@@ -16,13 +16,12 @@ import org.hibernate.annotations.Check
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_show_performer",
-            columnNames = ["show_id", "performer_id"]
-        )
-    ]
+            columnNames = ["show_id", "performer_id"],
+        ),
+    ],
 )
 @Check(constraints = "display_order >= 0")
 class ShowPerformer protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "show_id", nullable = false)
     lateinit var show: Show
@@ -55,14 +54,13 @@ class ShowPerformer protected constructor() : AuditableEntity() {
             performer: Performer,
             role: String? = null,
             displayOrder: Int = 0,
-        ): ShowPerformer {
-            return ShowPerformer().apply {
+        ): ShowPerformer =
+            ShowPerformer().apply {
                 this.show = show
                 this.performer = performer
                 this.role = normalizeRole(role)
                 this.displayOrder = validateDisplayOrder(displayOrder)
             }
-        }
 
         private fun normalizeRole(role: String?): String? {
             val normalized = role?.trim()

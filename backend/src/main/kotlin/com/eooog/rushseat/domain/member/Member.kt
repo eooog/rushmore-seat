@@ -8,7 +8,6 @@ import jakarta.persistence.Table
 @Entity
 @Table(name = "member")
 class Member protected constructor() : AuditableEntity() {
-
     @field:Column(name = "name", nullable = false, length = 100)
     lateinit var name: String
         protected set
@@ -18,11 +17,10 @@ class Member protected constructor() : AuditableEntity() {
     }
 
     companion object {
-        fun create(name: String): Member {
-            return Member().apply {
+        fun create(name: String): Member =
+            Member().apply {
                 this.name = validateName(name)
             }
-        }
 
         private fun validateName(name: String): String {
             val normalized = name.trim()

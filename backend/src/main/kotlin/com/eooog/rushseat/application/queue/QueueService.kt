@@ -23,7 +23,6 @@ class QueueService(
     GetQueueStatusUseCase,
     AdmitQueueUseCase,
     ValidateAdmissionUseCase {
-
     private val queueTokenTtl = Duration.ofSeconds(queueTokenTtlSeconds)
     private val admissionTokenTtl = Duration.ofSeconds(admissionTokenTtlSeconds)
 
@@ -36,12 +35,13 @@ class QueueService(
 
         val queueToken = "qt_${UUID.randomUUID()}"
         queueStatePort.saveQueueToken(
-            token = QueueTokenRecord(
-                token = queueToken,
-                performanceId = command.performanceId,
-                memberId = command.memberId,
-                status = QueueStatus.WAITING,
-            ),
+            token =
+                QueueTokenRecord(
+                    token = queueToken,
+                    performanceId = command.performanceId,
+                    memberId = command.memberId,
+                    status = QueueStatus.WAITING,
+                ),
             ttl = queueTokenTtl,
         )
         queueStatePort.saveMemberQueueToken(
@@ -61,8 +61,9 @@ class QueueService(
     }
 
     override fun getStatus(query: GetQueueStatusQuery): QueueStatusResult {
-        val token = queueStatePort.loadQueueToken(query.queueToken)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Queue token is invalid or expired")
+        val token =
+            queueStatePort.loadQueueToken(query.queueToken)
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Queue token is invalid or expired")
 
         if (token.performanceId != query.performanceId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Queue token does not belong to this performance")
@@ -90,38 +91,41 @@ class QueueService(
 
     override fun admit(command: AdmitQueueCommand): AdmitQueueResult {
         val limit = command.limit.coerceIn(1, 1_000)
-        val admittedMembers = queueStatePort.popWaitingMembers(
-            performanceId = command.performanceId,
-            limit = limit,
-        )
-
-        val expiresAt = command.requestedAt.plus(admissionTokenTtl)
-        val admissions = admittedMembers.map { memberId ->
-            val admissionToken = "at_${UUID.randomUUID()}"
-
-            queueStatePort.saveAdmissionToken(
-                token = AdmissionTokenRecord(
-                    token = admissionToken,
-                    performanceId = command.performanceId,
-                    memberId = memberId,
-                ),
-                ttl = admissionTokenTtl,
+        val admittedMembers =
+            queueStatePort.popWaitingMembers(
+                performanceId = command.performanceId,
+                limit = limit,
             )
 
-            queueStatePort.findMemberQueueToken(command.performanceId, memberId)?.let { queueToken ->
-                queueStatePort.markQueueTokenAdmitted(
-                    queueToken = queueToken,
+        val expiresAt = command.requestedAt.plus(admissionTokenTtl)
+        val admissions =
+            admittedMembers.map { memberId ->
+                val admissionToken = "at_${UUID.randomUUID()}"
+
+                queueStatePort.saveAdmissionToken(
+                    token =
+                        AdmissionTokenRecord(
+                            token = admissionToken,
+                            performanceId = command.performanceId,
+                            memberId = memberId,
+                        ),
+                    ttl = admissionTokenTtl,
+                )
+
+                queueStatePort.findMemberQueueToken(command.performanceId, memberId)?.let { queueToken ->
+                    queueStatePort.markQueueTokenAdmitted(
+                        queueToken = queueToken,
+                        admissionToken = admissionToken,
+                        expiresAt = expiresAt,
+                    )
+                }
+
+                AdmissionResult(
+                    memberId = memberId,
                     admissionToken = admissionToken,
                     expiresAt = expiresAt,
                 )
             }
-
-            AdmissionResult(
-                memberId = memberId,
-                admissionToken = admissionToken,
-                expiresAt = expiresAt,
-            )
-        }
 
         return AdmitQueueResult(
             admittedCount = admissions.size,
@@ -130,8 +134,9 @@ class QueueService(
     }
 
     override fun requireAdmitted(command: ValidateAdmissionCommand): AdmittedMember {
-        val token = queueStatePort.loadAdmissionToken(command.admissionToken)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Admission token is invalid or expired")
+        val token =
+            queueStatePort.loadAdmissionToken(command.admissionToken)
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Admission token is invalid or expired")
 
         if (token.performanceId != command.performanceId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Admission token does not belong to this performance")

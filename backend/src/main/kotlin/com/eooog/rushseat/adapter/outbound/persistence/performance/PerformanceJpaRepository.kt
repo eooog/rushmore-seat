@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface PerformanceJpaRepository : JpaRepository<Performance, Long> {
-
     @Query(
         """
         SELECT p.id AS performanceId,
@@ -16,7 +15,7 @@ interface PerformanceJpaRepository : JpaRepository<Performance, Long> {
                p.salesStatus AS salesStatus
         FROM Performance p
         WHERE p.id = :performanceId
-        """
+        """,
     )
     fun findSalesStatus(
         @Param("performanceId") performanceId: Long,

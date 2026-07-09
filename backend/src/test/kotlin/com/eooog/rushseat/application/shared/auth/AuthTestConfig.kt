@@ -14,41 +14,30 @@ private val TEST_ACCESS_TOKEN_TTL = Duration.ofSeconds(600)
 
 @TestConfiguration(proxyBeanMethods = false)
 class AuthTestConfig {
-
     @Bean
     @Primary
-    fun testClock(): TestClock {
-        return TestClock(TEST_INITIAL_INSTANT)
-    }
+    fun testClock(): TestClock = TestClock(TEST_INITIAL_INSTANT)
 
     @Bean
-    fun fakeAccessTokenStorePort(
-        clock: Clock,
-    ): AccessTokenStorePort {
-        return FakeAccessTokenStorePort(clock)
-    }
+    fun fakeAccessTokenStorePort(clock: Clock): AccessTokenStorePort = FakeAccessTokenStorePort(clock)
 
     @Bean
-    fun accessTokenGenerator(): AccessTokenGenerator {
-        return AccessTokenGenerator()
-    }
+    fun accessTokenGenerator(): AccessTokenGenerator = AccessTokenGenerator()
 
     @Bean
     fun authService(
         accessTokenGenerator: AccessTokenGenerator,
         accessTokenStorePort: AccessTokenStorePort,
-    ): AuthService {
-        return AuthService(
+    ): AuthService =
+        AuthService(
             accessTokenGenerator = accessTokenGenerator,
             accessTokenStorePort = accessTokenStorePort,
             accessTokenTtl = TEST_ACCESS_TOKEN_TTL,
         )
-    }
 
     class FakeAccessTokenStorePort(
         private val clock: Clock,
     ) : AccessTokenStorePort {
-
         private val store = mutableMapOf<AccessToken, Entry>()
 
         override fun save(
@@ -56,10 +45,11 @@ class AuthTestConfig {
             memberId: Long,
             ttl: Duration,
         ) {
-            store[accessToken] = Entry(
-                memberId = memberId,
-                expiredAt = clock.instant().plus(ttl),
-            )
+            store[accessToken] =
+                Entry(
+                    memberId = memberId,
+                    expiredAt = clock.instant().plus(ttl),
+                )
         }
 
         override fun findMemberId(accessToken: AccessToken): Long? {

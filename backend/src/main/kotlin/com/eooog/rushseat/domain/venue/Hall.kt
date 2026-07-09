@@ -13,7 +13,6 @@ import org.hibernate.annotations.Check
 @Table(name = "hall")
 @Check(constraints = "capacity > 0")
 class Hall protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "venue_id", nullable = false)
     lateinit var venue: Venue
@@ -40,13 +39,12 @@ class Hall protected constructor() : AuditableEntity() {
             venue: Venue,
             name: String,
             capacity: Int,
-        ): Hall {
-            return Hall().apply {
+        ): Hall =
+            Hall().apply {
                 this.venue = venue
                 this.name = validateName(name)
                 this.capacity = validateCapacity(capacity)
             }
-        }
 
         private fun validateName(name: String): String {
             val normalized = name.trim()
@@ -69,5 +67,4 @@ class Hall protected constructor() : AuditableEntity() {
             return capacity
         }
     }
-
 }

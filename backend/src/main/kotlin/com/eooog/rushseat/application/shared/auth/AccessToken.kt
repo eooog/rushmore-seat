@@ -4,7 +4,6 @@ package com.eooog.rushseat.application.shared.auth
 value class AccessToken private constructor(
     val value: String,
 ) {
-
     companion object {
         private val PATTERN = Regex("^acc_[A-Za-z0-9_-]{43}$")
 

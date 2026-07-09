@@ -8,13 +8,12 @@ import java.time.Duration
 
 @Component
 class RedisAccessTokenStoreAdapter(
-    private val redis: StringRedisTemplate
+    private val redis: StringRedisTemplate,
 ) : AccessTokenStorePort {
-
     override fun save(
         accessToken: AccessToken,
         memberId: Long,
-        ttl: Duration
+        ttl: Duration,
     ) {
         redis.opsForValue().set(
             accessTokenKey(accessToken),
@@ -23,13 +22,11 @@ class RedisAccessTokenStoreAdapter(
         )
     }
 
-    override fun findMemberId(accessToken: AccessToken): Long? {
-        return redis.opsForValue()
+    override fun findMemberId(accessToken: AccessToken): Long? =
+        redis
+            .opsForValue()
             .get(accessTokenKey(accessToken))
             ?.toLongOrNull()
-    }
 
-    private fun accessTokenKey(accessToken: AccessToken): String {
-        return "auth:access:${accessToken.value}"
-    }
+    private fun accessTokenKey(accessToken: AccessToken): String = "auth:access:${accessToken.value}"
 }

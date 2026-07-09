@@ -13,7 +13,5 @@ class SeedController(
     fun seed(
         @PathVariable eventId: Long,
         @RequestBody request: SeedEventRequest,
-    ): SeedEventResponse {
-        return seedService.seed(eventId, request)
-    }
+    ): SeedEventResponse = seedService.seed(eventId, request)
 }

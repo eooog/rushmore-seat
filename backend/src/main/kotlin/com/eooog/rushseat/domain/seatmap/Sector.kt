@@ -15,12 +15,11 @@ import jakarta.persistence.UniqueConstraint
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_sector_seat_map_code",
-            columnNames = ["seat_map_id", "code"]
-        )
-    ]
+            columnNames = ["seat_map_id", "code"],
+        ),
+    ],
 )
 class Sector protected constructor() : AuditableEntity() {
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "seat_map_id", nullable = false)
     lateinit var seatMap: SeatMap
@@ -52,14 +51,13 @@ class Sector protected constructor() : AuditableEntity() {
             code: String,
             name: String,
             sortOrder: Int = 0,
-        ): Sector {
-            return Sector().apply {
+        ): Sector =
+            Sector().apply {
                 this.seatMap = seatMap
                 this.code = validateCode(code)
                 this.name = validateName(name)
                 this.sortOrder = validateSortOrder(sortOrder)
             }
-        }
 
         private fun validateCode(code: String): String {
             val normalized = code.trim()

@@ -12,16 +12,16 @@ import org.springframework.web.bind.annotation.RestController
 class InternalAuthController(
     private val issueAccessTokenUseCase: IssueAccessTokenUseCase,
 ) {
-
     @PostMapping("/internal/auth/access-tokens")
     fun issue(
         @Valid @RequestBody request: IssueAccessTokenRequest,
     ): IssueAccessTokenResponse {
-        val result = issueAccessTokenUseCase.issue(
-            IssueAccessTokenCommand(
-                memberId = request.memberId,
+        val result =
+            issueAccessTokenUseCase.issue(
+                IssueAccessTokenCommand(
+                    memberId = request.memberId,
+                ),
             )
-        )
 
         return IssueAccessTokenResponse(
             accessToken = result.accessToken.value,
