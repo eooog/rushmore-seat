@@ -138,6 +138,10 @@ class QueueService(
             queueStatePort.loadAdmissionToken(command.admissionToken)
                 ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Admission token is invalid or expired")
 
+        if (token.memberId != command.memberId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Admission token does not belong to this member")
+        }
+
         if (token.performanceId != command.performanceId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Admission token does not belong to this performance")
         }
