@@ -1,0 +1,27 @@
+# 최상위 설정 파일임을 명시
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+tab_width = 4
+indent_size = 4
+indent_style = space
+max_line_length = 120
+trim_trailing_whitespace = true
+
+# IntelliJ 커스텀 설정
+ij_continuation_indent_size = 4
+ij_formatter_off_tag = @formatter:off
+ij_formatter_on_tag = @formatter:on
+ij_formatter_tags_enabled = true
+
+[*.{kt,kts}]
+# 후행 쉼표 활성화 (Git Diff 리뷰 시 충돌 방지 및 가독성 향상)
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# 와일드카드 임포트(import java.util.*) 방지 (개별 클래스 명시 권장)
+ij_kotlin_name_count_to_use_star_import = 99
+ij_kotlin_name_count_to_use_star_import_for_members = 99
