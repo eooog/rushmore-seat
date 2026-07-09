@@ -17,13 +17,14 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.Instant
+import java.time.Clock
 
 @RestController
 class QueueController(
     private val enterQueueUseCase: EnterQueueUseCase,
     private val getQueueStatusUseCase: GetQueueStatusUseCase,
     private val admitQueueUseCase: AdmitQueueUseCase,
+    private val clock: Clock,
 ) {
     @PostMapping("/performances/{performanceId}/queue")
     fun enter(
@@ -34,7 +35,7 @@ class QueueController(
             EnterQueueCommand(
                 performanceId = performanceId,
                 memberId = request.memberId,
-                requestedAt = Instant.now(),
+                requestedAt = clock.instant(),
             ),
         )
 
@@ -59,7 +60,7 @@ class QueueController(
             AdmitQueueCommand(
                 performanceId = performanceId,
                 limit = limit,
-                requestedAt = Instant.now(),
+                requestedAt = clock.instant(),
             ),
         )
 }

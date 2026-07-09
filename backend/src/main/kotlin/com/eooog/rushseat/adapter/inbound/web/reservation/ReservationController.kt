@@ -58,7 +58,7 @@ class ReservationController(
                 ConfirmReservationCommand(
                     performanceId = performanceId,
                     memberId = principal.memberId,
-                    requestedAt = Instant.now(),
+                    requestedAt = clock.instant(),
                 ),
             )
 
