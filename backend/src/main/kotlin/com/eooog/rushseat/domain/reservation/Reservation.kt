@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import jakarta.persistence.Version
 import java.time.Instant
 
 @Entity
@@ -56,6 +57,11 @@ class Reservation protected constructor() : AuditableEntity() {
 
     @field:Column(name = "confirmed_at")
     var confirmedAt: Instant? = null
+        protected set
+
+    @field:Version
+    @field:Column(name = "version", nullable = false)
+    var version: Long = 0
         protected set
 
     fun confirm(now: Instant) {
@@ -110,6 +116,7 @@ class Reservation protected constructor() : AuditableEntity() {
                 this.idempotencyKey = validateIdempotencyKey(idempotencyKey)
                 this.expiresAt = expiresAt
                 this.confirmedAt = null
+                this.version = 0
             }
         }
 
