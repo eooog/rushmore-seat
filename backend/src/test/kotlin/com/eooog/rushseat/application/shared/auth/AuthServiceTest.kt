@@ -13,10 +13,10 @@ import java.time.Duration
 @SpringJUnitConfig(AuthTestConfig::class)
 class AuthServiceTest {
     @Autowired
-    lateinit var authService: AuthService
+    lateinit var clock: TestClock
 
     @Autowired
-    lateinit var clock: TestClock
+    lateinit var authService: AuthService
 
     @Autowired
     lateinit var fakeAccessTokenStorePort: FakeAccessTokenStorePort
