@@ -134,8 +134,9 @@ class ReservationTest : DomainTestSupport() {
     }
 
     @Test
-    fun `createHeld should accept idempotency key with 120 characters`() {
-        val idempotencyKey = "A".repeat(120)
+    fun `createHeld should accept idempotency key when trimmed length is 120 characters`() {
+        val normalizedIdempotencyKey = "A".repeat(120)
+        val idempotencyKey = "  $normalizedIdempotencyKey  "
 
         val reservation =
             createHeldReservation(
@@ -143,7 +144,8 @@ class ReservationTest : DomainTestSupport() {
                 idempotencyKey = idempotencyKey,
             )
 
-        assertThat(reservation.idempotencyKey).isEqualTo(idempotencyKey)
+        assertThat(idempotencyKey.length).isGreaterThan(120)
+        assertThat(reservation.idempotencyKey).isEqualTo(normalizedIdempotencyKey)
     }
 
     @Test
