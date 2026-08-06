@@ -10,7 +10,6 @@ import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
 import com.eooog.rushseat.application.shared.auth.MemberPrincipal
-import jakarta.validation.constraints.Positive
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -34,21 +33,18 @@ class QueueController(
             EnterQueueCommand(
                 performanceId = performanceId,
                 memberId = principal.memberId,
-                requestedAt = Instant.now(),
             ),
         )
 
     @GetMapping("/performances/{performanceId}/queue/me")
     fun me(
         @PathVariable performanceId: Long,
-        @RequestParam queueToken: String,
         @AuthenticationPrincipal principal: MemberPrincipal,
     ): QueueStatusResult =
         getQueueStatusUseCase.getStatus(
             GetQueueStatusQuery(
                 performanceId = performanceId,
                 memberId = principal.memberId,
-                queueToken = queueToken,
             ),
         )
 
@@ -66,8 +62,3 @@ class QueueController(
             ),
         )
 }
-
-data class QueueEnterRequest(
-    @field:Positive
-    val memberId: Long,
-)

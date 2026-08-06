@@ -4,82 +4,56 @@ import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
 import com.eooog.rushseat.application.queue.provided.ValidateAdmissionUseCase
-import com.eooog.rushseat.application.queue.required.AdmissionTokenRecord
 import com.eooog.rushseat.application.queue.required.QueueStatePort
-import com.eooog.rushseat.application.queue.required.QueueTokenRecord
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
 import java.time.Duration
 import java.util.UUID
 
 @Service
 class QueueService(
     private val queueStatePort: QueueStatePort,
-    @Value("\${rushmore-seat.queue.token-ttl-seconds}") queueTokenTtlSeconds: Long,
+    private val clock: Clock,
     @Value("\${rushmore-seat.queue.admission-token-ttl-seconds}") admissionTokenTtlSeconds: Long,
 ) : EnterQueueUseCase,
     GetQueueStatusUseCase,
     AdmitQueueUseCase,
     ValidateAdmissionUseCase {
-    private val queueTokenTtl = Duration.ofSeconds(queueTokenTtlSeconds)
     private val admissionTokenTtl = Duration.ofSeconds(admissionTokenTtlSeconds)
 
     override fun enter(command: EnterQueueCommand): QueueEnterResult {
+        val requestedAt = clock.instant()
+
         queueStatePort.addWaitingMember(
             performanceId = command.performanceId,
             memberId = command.memberId,
-            joinedAtMillis = command.requestedAt.toEpochMilli(),
         )
 
-        val queueToken = "qt_${UUID.randomUUID()}"
-        queueStatePort.saveQueueToken(
-            token =
-                QueueTokenRecord(
-                    token = queueToken,
-                    performanceId = command.performanceId,
-                    memberId = command.memberId,
-                    status = QueueStatus.WAITING,
-                ),
-            ttl = queueTokenTtl,
-        )
-        queueStatePort.saveMemberQueueToken(
-            performanceId = command.performanceId,
-            memberId = command.memberId,
-            queueToken = queueToken,
-            ttl = queueTokenTtl,
-        )
-
-        val rank = queueStatePort.getWaitingRank(command.performanceId, command.memberId)?.plus(1)
         return QueueEnterResult(
             status = QueueStatus.WAITING,
-            queueToken = queueToken,
-            rank = rank,
-            estimatedWaitSeconds = estimateWaitSeconds(rank),
+            joinedAt = requestedAt,
         )
     }
 
     override fun getStatus(query: GetQueueStatusQuery): QueueStatusResult {
-        val token =
-            queueStatePort.loadQueueToken(query.queueToken)
-                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Queue token is invalid or expired")
-
-        if (token.performanceId != query.performanceId) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Queue token does not belong to this performance")
-        }
-
-        if (token.status == QueueStatus.ADMITTED) {
+        val admission = queueStatePort.findAdmissionByMember(query.performanceId, query.memberId)
+        if (admission != null) {
             return QueueStatusResult(
                 status = QueueStatus.ADMITTED,
                 rank = null,
                 estimatedWaitSeconds = null,
-                admissionToken = token.admissionToken,
-                expiresAt = token.admissionExpiresAt,
+                admissionToken = admission.admissionToken,
+                expiresAt = admission.expiresAt,
             )
         }
 
-        val rank = queueStatePort.getWaitingRank(query.performanceId, token.memberId)?.plus(1)
+        val rank =
+            queueStatePort.getWaitingRank(query.performanceId, query.memberId)?.plus(1)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No queue entry found for this member")
+
         return QueueStatusResult(
             status = QueueStatus.WAITING,
             rank = rank,
@@ -102,23 +76,13 @@ class QueueService(
             admittedMembers.map { memberId ->
                 val admissionToken = "at_${UUID.randomUUID()}"
 
-                queueStatePort.saveAdmissionToken(
-                    token =
-                        AdmissionTokenRecord(
-                            token = admissionToken,
-                            performanceId = command.performanceId,
-                            memberId = memberId,
-                        ),
+                queueStatePort.admit(
+                    performanceId = command.performanceId,
+                    memberId = memberId,
+                    admissionToken = admissionToken,
+                    expiresAt = expiresAt,
                     ttl = admissionTokenTtl,
                 )
-
-                queueStatePort.findMemberQueueToken(command.performanceId, memberId)?.let { queueToken ->
-                    queueStatePort.markQueueTokenAdmitted(
-                        queueToken = queueToken,
-                        admissionToken = admissionToken,
-                        expiresAt = expiresAt,
-                    )
-                }
 
                 AdmissionResult(
                     memberId = memberId,

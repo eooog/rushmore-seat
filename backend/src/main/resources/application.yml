@@ -36,7 +36,6 @@ rushmore-seat:
     auth:
         access-token-ttl: 600s
     queue:
-        token-ttl-seconds: 3600
         admission-token-ttl-seconds: 180
     hold:
         ttl-seconds: 180

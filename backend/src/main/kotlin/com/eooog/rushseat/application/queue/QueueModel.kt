@@ -10,20 +10,16 @@ enum class QueueStatus {
 data class EnterQueueCommand(
     val performanceId: Long,
     val memberId: Long,
-    val requestedAt: Instant,
 )
 
 data class QueueEnterResult(
     val status: QueueStatus,
-    val queueToken: String,
-    val rank: Long?,
-    val estimatedWaitSeconds: Long?,
+    val joinedAt: Instant,
 )
 
 data class GetQueueStatusQuery(
     val performanceId: Long,
     val memberId: Long,
-    val queueToken: String,
 )
 
 data class QueueStatusResult(

@@ -1,9 +1,9 @@
 package com.eooog.rushseat.adapter.outbound.queue.redis
 
-import com.eooog.rushseat.application.queue.QueueStatus
+import com.eooog.rushseat.application.queue.required.AdmissionRecord
 import com.eooog.rushseat.application.queue.required.AdmissionTokenRecord
 import com.eooog.rushseat.application.queue.required.QueueStatePort
-import com.eooog.rushseat.application.queue.required.QueueTokenRecord
+import org.springframework.data.redis.connection.StringRedisConnection
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
@@ -16,13 +16,11 @@ class RedisQueueAdapter(
     override fun addWaitingMember(
         performanceId: Long,
         memberId: Long,
-        joinedAtMillis: Long,
     ) {
-        redis.opsForZSet().add(
-            waitingKey(performanceId),
-            memberId.toString(),
-            joinedAtMillis.toDouble(),
-        )
+        val sequence =
+            redis.opsForValue().increment(sequenceKey(performanceId))
+                ?: error("sequence increment failed")
+        redis.opsForZSet().add(waitingKey(performanceId), memberId.toString(), sequence.toDouble())
     }
 
     override fun getWaitingRank(
@@ -40,82 +38,41 @@ class RedisQueueAdapter(
             .orEmpty()
             .mapNotNull { it.value?.toLongOrNull() }
 
-    override fun saveQueueToken(
-        token: QueueTokenRecord,
-        ttl: Duration,
-    ) {
-        val key = queueTokenKey(token.token)
-        redis.opsForHash<String, String>().putAll(
-            key,
-            mapOf(
-                "performanceId" to token.performanceId.toString(),
-                "memberId" to token.memberId.toString(),
-                "status" to token.status.name,
-            ) + optionalAdmissionFields(token),
-        )
-        redis.expire(key, ttl)
-    }
-
-    override fun loadQueueToken(queueToken: String): QueueTokenRecord? {
-        val values = redis.opsForHash<String, String>().entries(queueTokenKey(queueToken))
-        if (values.isEmpty()) return null
-
-        return QueueTokenRecord(
-            token = queueToken,
-            performanceId = values["performanceId"]?.toLongOrNull() ?: return null,
-            memberId = values["memberId"]?.toLongOrNull() ?: return null,
-            status = values["status"]?.let(QueueStatus::valueOf) ?: QueueStatus.WAITING,
-            admissionToken = values["admissionToken"],
-            admissionExpiresAt = values["admissionExpiresAt"]?.let(Instant::parse),
-        )
-    }
-
-    override fun saveMemberQueueToken(
+    override fun admit(
         performanceId: Long,
         memberId: Long,
-        queueToken: String,
-        ttl: Duration,
-    ) {
-        redis.opsForValue().set(
-            memberQueueTokenKey(performanceId, memberId),
-            queueToken,
-            ttl,
-        )
-    }
-
-    override fun findMemberQueueToken(
-        performanceId: Long,
-        memberId: Long,
-    ): String? = redis.opsForValue().get(memberQueueTokenKey(performanceId, memberId))
-
-    override fun markQueueTokenAdmitted(
-        queueToken: String,
         admissionToken: String,
         expiresAt: Instant,
-    ) {
-        redis.opsForHash<String, String>().putAll(
-            queueTokenKey(queueToken),
-            mapOf(
-                "status" to QueueStatus.ADMITTED.name,
-                "admissionToken" to admissionToken,
-                "admissionExpiresAt" to expiresAt.toString(),
-            ),
-        )
-    }
-
-    override fun saveAdmissionToken(
-        token: AdmissionTokenRecord,
         ttl: Duration,
     ) {
-        val key = admissionTokenKey(token.token)
-        redis.opsForHash<String, String>().putAll(
-            key,
-            mapOf(
-                "performanceId" to token.performanceId.toString(),
-                "memberId" to token.memberId.toString(),
-            ),
+        redis.executePipelined { connection ->
+            val stringConn = connection as StringRedisConnection
+            val tokenKey = admissionTokenKey(admissionToken)
+            val memberKey = admissionByMemberKey(performanceId, memberId)
+
+            stringConn.hSet(tokenKey, "performanceId", performanceId.toString())
+            stringConn.hSet(tokenKey, "memberId", memberId.toString())
+            stringConn.expire(tokenKey, ttl.seconds)
+
+            stringConn.hSet(memberKey, "admissionToken", admissionToken)
+            stringConn.hSet(memberKey, "expiresAt", expiresAt.toString())
+            stringConn.expire(memberKey, ttl.seconds)
+
+            null
+        }
+    }
+
+    override fun findAdmissionByMember(
+        performanceId: Long,
+        memberId: Long,
+    ): AdmissionRecord? {
+        val values = redis.opsForHash<String, String>().entries(admissionByMemberKey(performanceId, memberId))
+        if (values.isEmpty()) return null
+
+        return AdmissionRecord(
+            admissionToken = values["admissionToken"] ?: return null,
+            expiresAt = values["expiresAt"]?.let(Instant::parse) ?: return null,
         )
-        redis.expire(key, ttl)
     }
 
     override fun loadAdmissionToken(admissionToken: String): AdmissionTokenRecord? {
@@ -129,27 +86,14 @@ class RedisQueueAdapter(
         )
     }
 
-    private fun optionalAdmissionFields(token: QueueTokenRecord): Map<String, String> {
-        val admissionToken = token.admissionToken
-        val admissionExpiresAt = token.admissionExpiresAt
-        if (admissionToken == null || admissionExpiresAt == null) {
-            return emptyMap()
-        }
-
-        return mapOf(
-            "admissionToken" to admissionToken,
-            "admissionExpiresAt" to admissionExpiresAt.toString(),
-        )
-    }
-
     private fun waitingKey(performanceId: Long): String = "queue:waiting:$performanceId"
 
-    private fun queueTokenKey(queueToken: String): String = "queue:token:$queueToken"
-
-    private fun memberQueueTokenKey(
+    private fun admissionByMemberKey(
         performanceId: Long,
         memberId: Long,
-    ): String = "queue:member-token:$performanceId:$memberId"
+    ): String = "admission:member:$performanceId:$memberId"
+
+    private fun sequenceKey(performanceId: Long): String = "queue:seq:$performanceId"
 
     private fun admissionTokenKey(admissionToken: String): String = "admission:token:$admissionToken"
 }
