@@ -9,12 +9,12 @@ import com.eooog.rushseat.application.queue.QueueStatusResult
 import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
-import jakarta.validation.Valid
+import com.eooog.rushseat.application.shared.auth.MemberPrincipal
 import jakarta.validation.constraints.Positive
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
@@ -28,12 +28,12 @@ class QueueController(
     @PostMapping("/performances/{performanceId}/queue")
     fun enter(
         @PathVariable performanceId: Long,
-        @Valid @RequestBody request: QueueEnterRequest,
+        @AuthenticationPrincipal principal: MemberPrincipal,
     ): QueueEnterResult =
         enterQueueUseCase.enter(
             EnterQueueCommand(
                 performanceId = performanceId,
-                memberId = request.memberId,
+                memberId = principal.memberId,
                 requestedAt = Instant.now(),
             ),
         )
@@ -42,14 +42,17 @@ class QueueController(
     fun me(
         @PathVariable performanceId: Long,
         @RequestParam queueToken: String,
+        @AuthenticationPrincipal principal: MemberPrincipal,
     ): QueueStatusResult =
         getQueueStatusUseCase.getStatus(
             GetQueueStatusQuery(
                 performanceId = performanceId,
+                memberId = principal.memberId,
                 queueToken = queueToken,
             ),
         )
 
+    // TODO: verify manager authentication
     @PostMapping("/internal/performances/{performanceId}/admissions")
     fun admit(
         @PathVariable performanceId: Long,

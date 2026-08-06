@@ -22,6 +22,7 @@ data class QueueEnterResult(
 
 data class GetQueueStatusQuery(
     val performanceId: Long,
+    val memberId: Long,
     val queueToken: String,
 )
 
