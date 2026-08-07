@@ -37,6 +37,10 @@ const admittedTotal = new Counter('rushmore_admitted_total');
 const admissionTimeoutTotal = new Counter('rushmore_admission_timeout_total');
 const goalRejectedTotal = new Counter('rushmore_goal_rejected_total');
 const abandonedTotal = new Counter('rushmore_abandoned_total');
+// enter() 성공 직후부터는 매 폴링이 WAITING 또는 ADMITTED 둘 중 하나여야 한다.
+// 이거 말고 다른 게 나오면(404 등) admit()/getStatus() 경쟁 상태 재발을 의심할 것.
+const meUnexpectedTotal = new Counter('rushmore_me_unexpected_total');
+const leaveFailedTotal = new Counter('rushmore_leave_failed_total');
 
 export const options = {
     scenarios: {
@@ -56,6 +60,9 @@ export const options = {
         rushmore_goal_rejected_total: ['count==0'],
         // 정상 트래픽에서 admission 타임아웃은 거의 없어야 함 (target-capacity가 너무 낮으면 여기서 터짐)
         rushmore_admission_timeout_total: ['count<50'],
+        // enter() 성공 후 me()는 WAITING/ADMITTED 외의 응답이 나오면 안 됨 (admit()/getStatus() 경쟁 상태 지표)
+        rushmore_me_unexpected_total: ['count==0'],
+        rushmore_leave_failed_total: ['count==0'],
     },
 };
 
@@ -104,12 +111,17 @@ export default function () {
             { ...authHeaders, tags: { step: 'me' } },
         );
 
-        if (meRes.status === 200) {
-            const body = meRes.json();
-            if (body.status === 'ADMITTED') {
-                admissionToken = body.admissionToken;
-                break;
-            }
+        const meBody = meRes.status === 200 ? meRes.json() : null;
+        const meOk = check(meRes, {
+            'me: 200 with WAITING or ADMITTED': () =>
+                meBody !== null && (meBody.status === 'WAITING' || meBody.status === 'ADMITTED'),
+        });
+
+        if (!meOk) {
+            meUnexpectedTotal.add(1);
+        } else if (meBody.status === 'ADMITTED') {
+            admissionToken = meBody.admissionToken;
+            break;
         }
         sleep(POLL_INTERVAL_SECONDS);
     }
@@ -142,11 +154,13 @@ export default function () {
 
     // 6) leave() 90% / 방치 10% (TTL 자동 회수 경로 검증)
     if (Math.random() < LEAVE_PROBABILITY) {
-        http.post(
+        const leaveRes = http.post(
             `${BASE_URL}/performances/${PERFORMANCE_ID}/queue/leave`,
             null,
             { ...authHeaders, tags: { step: 'leave' } },
         );
+        const leaveOk = check(leaveRes, { 'leave: 200': (r) => r.status === 200 });
+        if (!leaveOk) leaveFailedTotal.add(1);
     } else {
         abandonedTotal.add(1);
     }
