@@ -48,20 +48,8 @@ class RedisQueueAdapterTest {
         adapter.addWaitingMember(performanceId, memberId)
         adapter.addWaitingMember(performanceId, memberId)
 
-        val popped = adapter.popWaitingMembers(performanceId, limit = 10)
-
-        assertThat(popped).containsExactly(memberId)
-    }
-
-    @Test
-    fun `popWaitingMembers() should remove members in join order`() {
-        adapter.addWaitingMember(performanceId, memberId = 1L)
-        adapter.addWaitingMember(performanceId, memberId = 2L)
-
-        val popped = adapter.popWaitingMembers(performanceId, limit = 1)
-
-        assertThat(popped).containsExactly(1L)
-        assertThat(adapter.getWaitingRank(performanceId, memberId = 2L)).isEqualTo(0L)
+        assertThat(admitNext()).isEqualTo(memberId)
+        assertThat(admitNext()).isNull()
     }
 
     @Test
@@ -70,16 +58,33 @@ class RedisQueueAdapterTest {
     }
 
     @Test
-    fun `admit() should populate both the member-keyed and token-keyed admission records`() {
+    fun `admitNextWaitingMember() should return null when the waiting queue is empty`() {
+        val poppedMemberId = admitNext(admissionToken = "at_abc")
+
+        assertThat(poppedMemberId).isNull()
+        assertThat(adapter.findAdmissionByMember(performanceId, memberId)).isNull()
+        assertThat(adapter.loadAdmissionToken("at_abc")).isNull()
+    }
+
+    @Test
+    fun `admitNextWaitingMember() should pop members in join order across repeated calls`() {
+        adapter.addWaitingMember(performanceId, memberId = 1L)
+        adapter.addWaitingMember(performanceId, memberId = 2L)
+
+        assertThat(admitNext()).isEqualTo(1L)
+        assertThat(admitNext()).isEqualTo(2L)
+        assertThat(admitNext()).isNull()
+    }
+
+    @Test
+    fun `admitNextWaitingMember() should pop the member and populate admission and occupancy records`() {
+        adapter.addWaitingMember(performanceId, memberId)
         val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
 
-        adapter.admit(
-            performanceId = performanceId,
-            memberId = memberId,
-            admissionToken = "at_abc",
-            expiresAt = expiresAt,
-            ttl = Duration.ofMinutes(3),
-        )
+        val poppedMemberId = admitNext(admissionToken = "at_abc", expiresAt = expiresAt)
+
+        assertThat(poppedMemberId).isEqualTo(memberId)
+        assertThat(adapter.getWaitingRank(performanceId, memberId)).isNull()
 
         val admission = adapter.findAdmissionByMember(performanceId, memberId)
         assertThat(admission).isNotNull
@@ -88,17 +93,15 @@ class RedisQueueAdapterTest {
 
         val tokenRecord = adapter.loadAdmissionToken("at_abc")
         assertThat(tokenRecord).isEqualTo(AdmissionTokenRecord(token = "at_abc", performanceId = performanceId, memberId = memberId))
+
+        assertThat(adapter.countOccupancy(performanceId, expiresAt.minusSeconds(1))).isEqualTo(1L)
     }
 
     @Test
-    fun `admit() records should expire after ttl`() {
-        adapter.admit(
-            performanceId = performanceId,
-            memberId = memberId,
-            admissionToken = "at_abc",
-            expiresAt = Instant.now().plusSeconds(1),
-            ttl = Duration.ofSeconds(1),
-        )
+    fun `admitNextWaitingMember() records should expire after ttl`() {
+        adapter.addWaitingMember(performanceId, memberId)
+
+        admitNext(admissionToken = "at_abc", expiresAt = Instant.now().plusSeconds(1), ttl = Duration.ofSeconds(1))
 
         assertThat(adapter.findAdmissionByMember(performanceId, memberId)).isNotNull
 
@@ -109,50 +112,37 @@ class RedisQueueAdapterTest {
     }
 
     @Test
-    fun `admit() should add the member to occupancy while the admission is still valid`() {
-        val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
-
-        adapter.admit(
-            performanceId = performanceId,
-            memberId = memberId,
-            admissionToken = "at_abc",
-            expiresAt = expiresAt,
-            ttl = Duration.ofMinutes(3),
-        )
-
-        assertThat(adapter.countOccupancy(performanceId, expiresAt.minusSeconds(1))).isEqualTo(1L)
-    }
-
-    @Test
     fun `countOccupancy() should exclude admissions that have expired by the given instant`() {
+        adapter.addWaitingMember(performanceId, memberId)
         val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
 
-        adapter.admit(
-            performanceId = performanceId,
-            memberId = memberId,
-            admissionToken = "at_abc",
-            expiresAt = expiresAt,
-            ttl = Duration.ofMinutes(3),
-        )
+        admitNext(admissionToken = "at_abc", expiresAt = expiresAt)
 
         assertThat(adapter.countOccupancy(performanceId, expiresAt.plusSeconds(1))).isEqualTo(0L)
     }
 
     @Test
     fun `release() should remove the member from occupancy`() {
+        adapter.addWaitingMember(performanceId, memberId)
         val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
 
-        adapter.admit(
-            performanceId = performanceId,
-            memberId = memberId,
-            admissionToken = "at_abc",
-            expiresAt = expiresAt,
-            ttl = Duration.ofMinutes(3),
-        )
+        admitNext(admissionToken = "at_abc", expiresAt = expiresAt)
         adapter.release(performanceId, memberId)
 
         assertThat(adapter.countOccupancy(performanceId, expiresAt.minusSeconds(1))).isEqualTo(0L)
     }
+
+    private fun admitNext(
+        admissionToken: String = "at_${System.nanoTime()}",
+        expiresAt: Instant = Instant.parse("2026-01-01T00:03:00Z"),
+        ttl: Duration = Duration.ofMinutes(3),
+    ): Long? =
+        adapter.admitNextWaitingMember(
+            performanceId = performanceId,
+            admissionToken = admissionToken,
+            expiresAt = expiresAt,
+            ttl = ttl,
+        )
 
     private fun flushRedis() {
         redisTemplate.execute { connection ->

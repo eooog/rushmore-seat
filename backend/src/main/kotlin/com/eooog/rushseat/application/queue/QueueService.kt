@@ -79,31 +79,26 @@ class QueueService(
 
     override fun admit(command: AdmitQueueCommand): AdmitQueueResult {
         val limit = command.limit.coerceIn(1, 1_000)
-        val admittedMembers =
-            queueStatePort.popWaitingMembers(
-                performanceId = command.performanceId,
-                limit = limit,
-            )
-
         val expiresAt = command.requestedAt.plus(admissionTokenTtl)
-        val admissions =
-            admittedMembers.map { memberId ->
-                val admissionToken = "at_${UUID.randomUUID()}"
+        val admissions = mutableListOf<AdmissionResult>()
 
-                queueStatePort.admit(
+        for (i in 0 until limit) {
+            val admissionToken = "at_${UUID.randomUUID()}"
+            val memberId =
+                queueStatePort.admitNextWaitingMember(
                     performanceId = command.performanceId,
-                    memberId = memberId,
                     admissionToken = admissionToken,
                     expiresAt = expiresAt,
                     ttl = admissionTokenTtl,
-                )
+                ) ?: break
 
+            admissions +=
                 AdmissionResult(
                     memberId = memberId,
                     admissionToken = admissionToken,
                     expiresAt = expiresAt,
                 )
-            }
+        }
 
         return AdmitQueueResult(
             admittedCount = admissions.size,

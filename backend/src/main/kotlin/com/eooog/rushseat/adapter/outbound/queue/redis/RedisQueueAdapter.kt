@@ -3,8 +3,8 @@ package com.eooog.rushseat.adapter.outbound.queue.redis
 import com.eooog.rushseat.application.queue.required.AdmissionRecord
 import com.eooog.rushseat.application.queue.required.AdmissionTokenRecord
 import com.eooog.rushseat.application.queue.required.QueueStatePort
-import org.springframework.data.redis.connection.StringRedisConnection
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.time.Instant
@@ -28,40 +28,23 @@ class RedisQueueAdapter(
         memberId: Long,
     ): Long? = redis.opsForZSet().rank(waitingKey(performanceId), memberId.toString())
 
-    override fun popWaitingMembers(
+    override fun admitNextWaitingMember(
         performanceId: Long,
-        limit: Int,
-    ): List<Long> =
-        redis
-            .opsForZSet()
-            .popMin(waitingKey(performanceId), limit.toLong())
-            .orEmpty()
-            .mapNotNull { it.value?.toLongOrNull() }
-
-    override fun admit(
-        performanceId: Long,
-        memberId: Long,
         admissionToken: String,
         expiresAt: Instant,
         ttl: Duration,
-    ) {
-        redis.executePipelined { connection ->
-            val stringConn = connection as StringRedisConnection
-            val tokenKey = admissionTokenKey(admissionToken)
-            val memberKey = admissionByMemberKey(performanceId, memberId)
-
-            stringConn.hSet(tokenKey, "performanceId", performanceId.toString())
-            stringConn.hSet(tokenKey, "memberId", memberId.toString())
-            stringConn.expire(tokenKey, ttl.seconds)
-
-            stringConn.hSet(memberKey, "admissionToken", admissionToken)
-            stringConn.hSet(memberKey, "expiresAt", expiresAt.toString())
-            stringConn.expire(memberKey, ttl.seconds)
-
-            stringConn.zAdd(occupancyKey(performanceId), expiresAt.toEpochMilli().toDouble(), memberId.toString())
-
-            null
-        }
+    ): Long? {
+        val memberId: String? =
+            redis.execute(
+                ADMIT_NEXT_WAITING_MEMBER_SCRIPT,
+                listOf(waitingKey(performanceId)),
+                performanceId.toString(),
+                admissionToken,
+                expiresAt.toString(),
+                expiresAt.toEpochMilli().toString(),
+                ttl.seconds.toString(),
+            )
+        return memberId?.toLongOrNull()
     }
 
     override fun findAdmissionByMember(
@@ -116,4 +99,44 @@ class RedisQueueAdapter(
     private fun sequenceKey(performanceId: Long): String = "queue:seq:$performanceId"
 
     private fun admissionTokenKey(admissionToken: String): String = "admission:token:$admissionToken"
+
+    companion object {
+        // KEYS[1] = queue:waiting:{performanceId}
+        // ARGV[1] = performanceId
+        // ARGV[2] = admissionToken
+        // ARGV[3] = expiresAt (ISO-8601 string, admission record field)
+        // ARGV[4] = expiresAt epoch millis (occupancy ZSET score)
+        // ARGV[5] = ttlSeconds
+        private val ADMIT_NEXT_WAITING_MEMBER_SCRIPT: RedisScript<String> =
+            RedisScript.of(
+                """
+                local popped = redis.call('ZPOPMIN', KEYS[1], 1)
+                if #popped == 0 then
+                    return false
+                end
+
+                local memberId = popped[1]
+                local performanceId = ARGV[1]
+                local admissionToken = ARGV[2]
+                local expiresAtIso = ARGV[3]
+                local expiresAtEpochMillis = ARGV[4]
+                local ttlSeconds = ARGV[5]
+
+                local tokenKey = 'admission:token:' .. admissionToken
+                local memberKey = 'admission:member:' .. performanceId .. ':' .. memberId
+                local occupancyKey = 'admission:occupancy:' .. performanceId
+
+                redis.call('HSET', tokenKey, 'performanceId', performanceId, 'memberId', memberId)
+                redis.call('EXPIRE', tokenKey, ttlSeconds)
+
+                redis.call('HSET', memberKey, 'admissionToken', admissionToken, 'expiresAt', expiresAtIso)
+                redis.call('EXPIRE', memberKey, ttlSeconds)
+
+                redis.call('ZADD', occupancyKey, expiresAtEpochMillis, memberId)
+
+                return memberId
+                """.trimIndent(),
+                String::class.java,
+            )
+    }
 }

@@ -135,6 +135,17 @@ class QueueServiceTest {
     }
 
     @Test
+    fun `admit() should stop early and preserve join order when the waiting queue has fewer members than the limit`() {
+        queueService.enter(enterCommand(memberId))
+        queueService.enter(enterCommand(otherMemberId))
+
+        val result = queueService.admit(admitCommand(limit = 10))
+
+        assertThat(result.admittedCount).isEqualTo(2)
+        assertThat(result.admissions.map { it.memberId }).containsExactly(memberId, otherMemberId)
+    }
+
+    @Test
     fun `requireAdmitted() should return the member when memberId matches the token`() {
         queueService.enter(enterCommand(memberId))
         val admitResult = queueService.admit(admitCommand(limit = 10))
@@ -242,27 +253,22 @@ class QueueServiceTest {
             return if (index >= 0) index.toLong() else null
         }
 
-        override fun popWaitingMembers(
+        override fun admitNextWaitingMember(
             performanceId: Long,
-            limit: Int,
-        ): List<Long> {
-            val members = waiting[performanceId] ?: return emptyList()
-            val popped = members.take(limit)
-            repeat(popped.size) { members.removeAt(0) }
-            return popped
-        }
-
-        override fun admit(
-            performanceId: Long,
-            memberId: Long,
             admissionToken: String,
             expiresAt: Instant,
             ttl: Duration,
-        ) {
+        ): Long? {
+            val members = waiting[performanceId]
+            if (members.isNullOrEmpty()) return null
+            val memberId = members.removeAt(0)
+
             admissionsByMember[performanceId to memberId] = AdmissionRecord(admissionToken, expiresAt)
             admissionTokens[admissionToken] = AdmissionTokenRecord(admissionToken, performanceId, memberId)
             tokenExpiresAt[admissionToken] = expiresAt
             occupancy.getOrPut(performanceId) { mutableMapOf() }[memberId] = expiresAt
+
+            return memberId
         }
 
         override fun findAdmissionByMember(

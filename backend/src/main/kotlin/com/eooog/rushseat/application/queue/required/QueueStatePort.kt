@@ -14,18 +14,12 @@ interface QueueStatePort {
         memberId: Long,
     ): Long?
 
-    fun popWaitingMembers(
+    fun admitNextWaitingMember(
         performanceId: Long,
-        limit: Int,
-    ): List<Long>
-
-    fun admit(
-        performanceId: Long,
-        memberId: Long,
         admissionToken: String,
         expiresAt: Instant,
         ttl: Duration,
-    )
+    ): Long?
 
     fun findAdmissionByMember(
         performanceId: Long,
