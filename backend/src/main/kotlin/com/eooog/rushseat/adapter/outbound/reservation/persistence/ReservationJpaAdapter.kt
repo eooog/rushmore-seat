@@ -1,14 +1,14 @@
 package com.eooog.rushseat.adapter.outbound.reservation.persistence
 
 import com.eooog.rushseat.adapter.outbound.persistence.performance.PerformanceJpaRepository
+import com.eooog.rushseat.application.performance.required.LoadPerformanceSalesStatusPort
+import com.eooog.rushseat.application.performance.required.PerformanceSalesStatusSnapshot
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationPort
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordCommand
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordResult
-import com.eooog.rushseat.application.reservation.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesCommand
 import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesPort
-import com.eooog.rushseat.application.reservation.required.PerformanceSalesStatusSnapshot
 import com.eooog.rushseat.application.reservation.required.ReservationReferences
 import com.eooog.rushseat.application.reservation.required.ReservationSnapshot
 import com.eooog.rushseat.application.reservation.required.SaveReservationPort

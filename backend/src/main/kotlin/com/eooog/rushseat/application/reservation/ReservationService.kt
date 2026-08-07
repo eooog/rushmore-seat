@@ -1,5 +1,6 @@
 package com.eooog.rushseat.application.reservation
 
+import com.eooog.rushseat.application.performance.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.reservation.provided.ConfirmReservationUseCase
 import com.eooog.rushseat.application.reservation.provided.HoldSeatUseCase
 import com.eooog.rushseat.application.reservation.required.ConfirmPerformanceSeatCommand
@@ -8,7 +9,6 @@ import com.eooog.rushseat.application.reservation.required.ConfirmReservationPor
 import com.eooog.rushseat.application.reservation.required.ConfirmReservationRecordCommand
 import com.eooog.rushseat.application.reservation.required.HoldPerformanceSeatCommand
 import com.eooog.rushseat.application.reservation.required.HoldPerformanceSeatPort
-import com.eooog.rushseat.application.reservation.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationPort
 import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesCommand
 import com.eooog.rushseat.application.reservation.required.LoadReservationReferencesPort

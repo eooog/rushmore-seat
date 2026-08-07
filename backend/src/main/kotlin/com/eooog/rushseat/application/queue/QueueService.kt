@@ -1,5 +1,6 @@
 package com.eooog.rushseat.application.queue
 
+import com.eooog.rushseat.application.performance.required.LoadPerformanceSalesStatusPort
 import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
@@ -18,6 +19,7 @@ import java.util.UUID
 @Service
 class QueueService(
     private val queueStatePort: QueueStatePort,
+    private val loadPerformanceSalesStatusPort: LoadPerformanceSalesStatusPort,
     private val clock: Clock,
     @Value("\${rushmore-seat.queue.admission-token-ttl-seconds}") admissionTokenTtlSeconds: Long,
 ) : EnterQueueUseCase,
@@ -29,6 +31,14 @@ class QueueService(
     private val admissionTokenTtl = Duration.ofSeconds(admissionTokenTtlSeconds)
 
     override fun enter(command: EnterQueueCommand): QueueEnterResult {
+        val snapshot =
+            loadPerformanceSalesStatusPort.load(command.performanceId)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Performance not found")
+
+        if (!snapshot.isOnSale()) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Performance is not on sale")
+        }
+
         val requestedAt = clock.instant()
 
         queueStatePort.addWaitingMember(

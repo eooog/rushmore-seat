@@ -2,25 +2,11 @@ package com.eooog.rushseat.application.reservation.required
 
 import com.eooog.rushseat.domain.member.Member
 import com.eooog.rushseat.domain.performance.Performance
-import com.eooog.rushseat.domain.performance.PerformanceSalesStatus
 import com.eooog.rushseat.domain.performance.PerformanceSeat
 import com.eooog.rushseat.domain.performance.PerformanceSeatStatus
-import com.eooog.rushseat.domain.performance.PerformanceStatus
 import com.eooog.rushseat.domain.reservation.Reservation
 import com.eooog.rushseat.domain.reservation.ReservationStatus
 import java.time.Instant
-
-interface LoadPerformanceSalesStatusPort {
-    fun load(performanceId: Long): PerformanceSalesStatusSnapshot?
-}
-
-data class PerformanceSalesStatusSnapshot(
-    val performanceId: Long,
-    val status: PerformanceStatus,
-    val salesStatus: PerformanceSalesStatus,
-) {
-    fun isOnSale(): Boolean = status == PerformanceStatus.SCHEDULED && salesStatus == PerformanceSalesStatus.ON_SALE
-}
 
 interface LoadReservationPort {
     fun findByIdempotencyKey(

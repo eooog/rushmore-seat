@@ -1,11 +1,16 @@
 package com.eooog.rushseat.application.queue
 
+import com.eooog.rushseat.application.performance.required.LoadPerformanceSalesStatusPort
+import com.eooog.rushseat.application.performance.required.PerformanceSalesStatusSnapshot
 import com.eooog.rushseat.application.queue.required.AdmissionRecord
 import com.eooog.rushseat.application.queue.required.AdmissionTokenRecord
 import com.eooog.rushseat.application.queue.required.QueueStatePort
+import com.eooog.rushseat.domain.performance.PerformanceSalesStatus
+import com.eooog.rushseat.domain.performance.PerformanceStatus
 import com.eooog.rushseat.support.time.TestClock
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowableOfType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.web.server.ResponseStatusException
@@ -15,6 +20,7 @@ import java.time.Instant
 
 class QueueServiceTest {
     private lateinit var queueStatePort: FakeQueueStatePort
+    private lateinit var loadPerformanceSalesStatusPort: FakeLoadPerformanceSalesStatusPort
     private lateinit var clock: TestClock
     private lateinit var queueService: QueueService
 
@@ -27,7 +33,11 @@ class QueueServiceTest {
     fun setUp() {
         clock = TestClock(Instant.parse("2026-01-01T00:00:00Z"))
         queueStatePort = FakeQueueStatePort(clock)
-        queueService = QueueService(queueStatePort, clock, admissionTokenTtlSeconds)
+        loadPerformanceSalesStatusPort =
+            FakeLoadPerformanceSalesStatusPort().apply {
+                setSalesStatus(performanceId, PerformanceStatus.SCHEDULED, PerformanceSalesStatus.ON_SALE)
+            }
+        queueService = QueueService(queueStatePort, loadPerformanceSalesStatusPort, clock, admissionTokenTtlSeconds)
     }
 
     @Test
@@ -36,6 +46,40 @@ class QueueServiceTest {
 
         assertThat(result.status).isEqualTo(QueueStatus.WAITING)
         assertThat(result.joinedAt).isEqualTo(clock.instant())
+    }
+
+    @Test
+    fun `enter() should throw 404 when performanceId does not exist`() {
+        val exception =
+            catchThrowableOfType(
+                ResponseStatusException::class.java,
+            ) { queueService.enter(EnterQueueCommand(performanceId = 404L, memberId = memberId)) }
+
+        assertThat(exception.statusCode.value()).isEqualTo(404)
+    }
+
+    @Test
+    fun `enter() should throw 409 when performance has not opened for sale yet`() {
+        loadPerformanceSalesStatusPort.setSalesStatus(performanceId, PerformanceStatus.SCHEDULED, PerformanceSalesStatus.BEFORE_SALE)
+
+        val exception =
+            catchThrowableOfType(
+                ResponseStatusException::class.java,
+            ) { queueService.enter(enterCommand(memberId)) }
+
+        assertThat(exception.statusCode.value()).isEqualTo(409)
+    }
+
+    @Test
+    fun `enter() should throw 409 when performance sales are closed`() {
+        loadPerformanceSalesStatusPort.setSalesStatus(performanceId, PerformanceStatus.SCHEDULED, PerformanceSalesStatus.CLOSED)
+
+        val exception =
+            catchThrowableOfType(
+                ResponseStatusException::class.java,
+            ) { queueService.enter(enterCommand(memberId)) }
+
+        assertThat(exception.statusCode.value()).isEqualTo(409)
     }
 
     @Test
@@ -260,5 +304,19 @@ class QueueServiceTest {
         }
 
         private fun isExpired(expiresAt: Instant): Boolean = !expiresAt.isAfter(clock.instant())
+    }
+
+    private class FakeLoadPerformanceSalesStatusPort : LoadPerformanceSalesStatusPort {
+        private val snapshots = mutableMapOf<Long, PerformanceSalesStatusSnapshot>()
+
+        fun setSalesStatus(
+            performanceId: Long,
+            status: PerformanceStatus,
+            salesStatus: PerformanceSalesStatus,
+        ) {
+            snapshots[performanceId] = PerformanceSalesStatusSnapshot(performanceId, status, salesStatus)
+        }
+
+        override fun load(performanceId: Long): PerformanceSalesStatusSnapshot? = snapshots[performanceId]
     }
 }
