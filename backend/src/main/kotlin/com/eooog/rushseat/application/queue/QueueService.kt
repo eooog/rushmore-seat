@@ -53,27 +53,27 @@ class QueueService(
     }
 
     override fun getStatus(query: GetQueueStatusQuery): QueueStatusResult {
-        val admission = queueStatePort.findAdmissionByMember(query.performanceId, query.memberId)
-        if (admission != null) {
+        val rank = queueStatePort.getWaitingRank(query.performanceId, query.memberId)
+        if (rank != null) {
             return QueueStatusResult(
-                status = QueueStatus.ADMITTED,
-                rank = null,
-                estimatedWaitSeconds = null,
-                admissionToken = admission.admissionToken,
-                expiresAt = admission.expiresAt,
+                status = QueueStatus.WAITING,
+                rank = rank + 1,
+                estimatedWaitSeconds = estimateWaitSeconds(rank + 1),
+                admissionToken = null,
+                expiresAt = null,
             )
         }
 
-        val rank =
-            queueStatePort.getWaitingRank(query.performanceId, query.memberId)?.plus(1)
+        val admission =
+            queueStatePort.findAdmissionByMember(query.performanceId, query.memberId)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No queue entry found for this member")
 
         return QueueStatusResult(
-            status = QueueStatus.WAITING,
-            rank = rank,
-            estimatedWaitSeconds = estimateWaitSeconds(rank),
-            admissionToken = null,
-            expiresAt = null,
+            status = QueueStatus.ADMITTED,
+            rank = null,
+            estimatedWaitSeconds = null,
+            admissionToken = admission.admissionToken,
+            expiresAt = admission.expiresAt,
         )
     }
 
