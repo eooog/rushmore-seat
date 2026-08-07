@@ -38,8 +38,8 @@ rushmore-seat:
     queue:
         admission-token-ttl-seconds: 180
         admission-scheduler-delay-ms: 5000
-        admission-scheduler-target-capacity: 100
-        admission-scheduler-performance-ids: ""
+        admission-scheduler-target-capacity: 500
+        admission-scheduler-performance-ids: "1"
     hold:
         ttl-seconds: 180
         claim-ttl-millis: 2000
