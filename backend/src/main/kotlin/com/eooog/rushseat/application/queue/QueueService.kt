@@ -106,6 +106,10 @@ class QueueService(
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Admission token does not belong to this performance")
         }
 
+        if (token.memberId != command.memberId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Admission token does not belong to this member")
+        }
+
         return AdmittedMember(
             performanceId = token.performanceId,
             memberId = token.memberId,

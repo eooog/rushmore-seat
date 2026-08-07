@@ -49,6 +49,7 @@ data class AdmissionResult(
 
 data class ValidateAdmissionCommand(
     val performanceId: Long,
+    val memberId: Long,
     val admissionToken: String,
 )
 

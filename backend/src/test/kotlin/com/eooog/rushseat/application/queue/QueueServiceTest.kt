@@ -89,15 +89,26 @@ class QueueServiceTest {
     }
 
     @Test
-    fun `requireAdmitted() should validate admission token independent of memberId lookup`() {
+    fun `requireAdmitted() should return the member when memberId matches the token`() {
         queueService.enter(enterCommand(memberId))
         val admitResult = queueService.admit(admitCommand(limit = 10))
         val admissionToken = admitResult.admissions.single().admissionToken
 
-        val admittedMember = queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, admissionToken))
+        val admittedMember =
+            queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, memberId, admissionToken))
 
         assertThat(admittedMember.memberId).isEqualTo(memberId)
-        assertThat(admittedMember.performanceId).isEqualTo(performanceId)
+    }
+
+    @Test
+    fun `requireAdmitted() should reject a token that belongs to a different member`() {
+        queueService.enter(enterCommand(memberId))
+        val admitResult = queueService.admit(admitCommand(limit = 10))
+        val admissionToken = admitResult.admissions.single().admissionToken
+
+        assertThatThrownBy {
+            queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, memberId = 999L, admissionToken))
+        }.isInstanceOf(ResponseStatusException::class.java)
     }
 
     private fun enterCommand(memberId: Long) = EnterQueueCommand(performanceId, memberId)
