@@ -2,14 +2,19 @@ package com.eooog.rushseat.adapter.inbound.web.queue
 
 import com.eooog.rushseat.application.queue.AdmitQueueCommand
 import com.eooog.rushseat.application.queue.AdmitQueueResult
+import com.eooog.rushseat.application.queue.AdmittedMember
 import com.eooog.rushseat.application.queue.EnterQueueCommand
 import com.eooog.rushseat.application.queue.GetQueueStatusQuery
+import com.eooog.rushseat.application.queue.LeaveQueueCommand
 import com.eooog.rushseat.application.queue.QueueEnterResult
 import com.eooog.rushseat.application.queue.QueueStatus
 import com.eooog.rushseat.application.queue.QueueStatusResult
+import com.eooog.rushseat.application.queue.ValidateAdmissionCommand
 import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
+import com.eooog.rushseat.application.queue.provided.LeaveQueueUseCase
+import com.eooog.rushseat.application.queue.provided.ValidateAdmissionUseCase
 import com.eooog.rushseat.application.shared.auth.MemberPrincipal
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -18,6 +23,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpStatus
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
@@ -28,12 +34,15 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 class QueueControllerTest {
     private val enterQueueUseCase = FakeEnterQueueUseCase()
     private val getQueueStatusUseCase = FakeGetQueueStatusUseCase()
     private val admitQueueUseCase = FakeAdmitQueueUseCase()
+    private val leaveQueueUseCase = FakeLeaveQueueUseCase()
+    private val validateAdmissionUseCase = FakeValidateAdmissionUseCase()
 
     private val objectMapper =
         ObjectMapper()
@@ -42,8 +51,15 @@ class QueueControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(QueueController(enterQueueUseCase, getQueueStatusUseCase, admitQueueUseCase))
-            .setCustomArgumentResolvers(AuthenticationPrincipalArgumentResolver())
+            .standaloneSetup(
+                QueueController(
+                    enterQueueUseCase,
+                    getQueueStatusUseCase,
+                    admitQueueUseCase,
+                    leaveQueueUseCase,
+                    validateAdmissionUseCase,
+                ),
+            ).setCustomArgumentResolvers(AuthenticationPrincipalArgumentResolver())
             .setMessageConverters(MappingJackson2HttpMessageConverter(objectMapper))
             .build()
 
@@ -97,6 +113,41 @@ class QueueControllerTest {
             .isEqualTo(GetQueueStatusQuery(performanceId = performanceId, memberId = memberId))
     }
 
+    @Test
+    fun `leave() should release the authenticated member's occupancy without an admissionToken`() {
+        mockMvc
+            .perform(post("/performances/{performanceId}/queue/leave", performanceId))
+            .andExpect(status().isOk)
+
+        assertThat(leaveQueueUseCase.lastCommand)
+            .isEqualTo(LeaveQueueCommand(performanceId = performanceId, memberId = memberId))
+    }
+
+    @Test
+    fun `goal() should pass the admission token header and principal through to requireAdmitted()`() {
+        validateAdmissionUseCase.result =
+            AdmittedMember(performanceId = performanceId, memberId = memberId, admissionToken = "at_abc")
+
+        mockMvc
+            .perform(post("/performances/{performanceId}/queue/goal", performanceId).header("X-Admission-Token", "at_abc"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.admissionToken").value("at_abc"))
+
+        assertThat(validateAdmissionUseCase.lastCommand)
+            .isEqualTo(ValidateAdmissionCommand(performanceId = performanceId, memberId = memberId, admissionToken = "at_abc"))
+    }
+
+    @Test
+    fun `goal() should return 401 when called without an admission token`() {
+        validateAdmissionUseCase.shouldReject = true
+
+        mockMvc
+            .perform(post("/performances/{performanceId}/queue/goal", performanceId))
+            .andExpect(status().isUnauthorized)
+
+        assertThat(validateAdmissionUseCase.lastCommand?.admissionToken).isEmpty()
+    }
+
     private class FakeEnterQueueUseCase : EnterQueueUseCase {
         var result = QueueEnterResult(status = QueueStatus.WAITING, joinedAt = Instant.EPOCH)
         var lastCommand: EnterQueueCommand? = null
@@ -126,5 +177,27 @@ class QueueControllerTest {
 
     private class FakeAdmitQueueUseCase : AdmitQueueUseCase {
         override fun admit(command: AdmitQueueCommand): AdmitQueueResult = AdmitQueueResult(admittedCount = 0, admissions = emptyList())
+    }
+
+    private class FakeLeaveQueueUseCase : LeaveQueueUseCase {
+        var lastCommand: LeaveQueueCommand? = null
+
+        override fun leave(command: LeaveQueueCommand) {
+            lastCommand = command
+        }
+    }
+
+    private class FakeValidateAdmissionUseCase : ValidateAdmissionUseCase {
+        var result = AdmittedMember(performanceId = 0, memberId = 0, admissionToken = "")
+        var shouldReject = false
+        var lastCommand: ValidateAdmissionCommand? = null
+
+        override fun requireAdmitted(command: ValidateAdmissionCommand): AdmittedMember {
+            lastCommand = command
+            if (shouldReject) {
+                throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Admission token is invalid or expired")
+            }
+            return result
+        }
     }
 }

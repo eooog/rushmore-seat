@@ -33,6 +33,16 @@ interface QueueStatePort {
     ): AdmissionRecord?
 
     fun loadAdmissionToken(admissionToken: String): AdmissionTokenRecord?
+
+    fun countOccupancy(
+        performanceId: Long,
+        now: Instant,
+    ): Long
+
+    fun release(
+        performanceId: Long,
+        memberId: Long,
+    )
 }
 
 data class AdmissionRecord(

@@ -9,6 +9,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
@@ -19,12 +20,13 @@ class QueueServiceTest {
 
     private val performanceId = 1L
     private val memberId = 259L
+    private val otherMemberId = 999L
     private val admissionTokenTtlSeconds = 180L
 
     @BeforeEach
     fun setUp() {
-        queueStatePort = FakeQueueStatePort()
         clock = TestClock(Instant.parse("2026-01-01T00:00:00Z"))
+        queueStatePort = FakeQueueStatePort(clock)
         queueService = QueueService(queueStatePort, clock, admissionTokenTtlSeconds)
     }
 
@@ -107,18 +109,76 @@ class QueueServiceTest {
         val admissionToken = admitResult.admissions.single().admissionToken
 
         assertThatThrownBy {
-            queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, memberId = 999L, admissionToken))
+            queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, memberId = otherMemberId, admissionToken))
         }.isInstanceOf(ResponseStatusException::class.java)
+    }
+
+    @Test
+    fun `requireAdmitted() should reject a token after it has expired`() {
+        queueService.enter(enterCommand(memberId))
+        val admitResult = queueService.admit(admitCommand(limit = 10))
+        val admissionToken = admitResult.admissions.single().admissionToken
+
+        clock.advance(Duration.ofSeconds(admissionTokenTtlSeconds))
+
+        assertThatThrownBy {
+            queueService.requireAdmitted(ValidateAdmissionCommand(performanceId, memberId, admissionToken))
+        }.isInstanceOf(ResponseStatusException::class.java)
+    }
+
+    @Test
+    fun `leave() should free capacity so refill() admits the next waiting member`() {
+        queueService.enter(enterCommand(memberId))
+        queueService.enter(enterCommand(otherMemberId))
+        queueService.admit(admitCommand(limit = 1))
+
+        queueService.leave(LeaveQueueCommand(performanceId, memberId))
+        val refillResult =
+            queueService.refill(RefillAdmissionsCommand(performanceId, targetCapacity = 1, requestedAt = clock.instant()))
+
+        assertThat(refillResult.admittedCount).isEqualTo(1)
+        val status = queueService.getStatus(GetQueueStatusQuery(performanceId, otherMemberId))
+        assertThat(status.status).isEqualTo(QueueStatus.ADMITTED)
+    }
+
+    @Test
+    fun `refill() should not admit anyone when occupancy already meets target capacity`() {
+        queueService.enter(enterCommand(memberId))
+        queueService.enter(enterCommand(otherMemberId))
+        queueService.admit(admitCommand(limit = 1))
+
+        val refillResult =
+            queueService.refill(RefillAdmissionsCommand(performanceId, targetCapacity = 1, requestedAt = clock.instant()))
+
+        assertThat(refillResult.admittedCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `refill() should treat expired admissions as no longer occupying capacity`() {
+        queueService.enter(enterCommand(memberId))
+        queueService.enter(enterCommand(otherMemberId))
+        queueService.admit(admitCommand(limit = 1))
+
+        clock.advance(Duration.ofSeconds(admissionTokenTtlSeconds))
+
+        val refillResult =
+            queueService.refill(RefillAdmissionsCommand(performanceId, targetCapacity = 1, requestedAt = clock.instant()))
+
+        assertThat(refillResult.admittedCount).isEqualTo(1)
     }
 
     private fun enterCommand(memberId: Long) = EnterQueueCommand(performanceId, memberId)
 
     private fun admitCommand(limit: Int) = AdmitQueueCommand(performanceId, limit, clock.instant())
 
-    private class FakeQueueStatePort : QueueStatePort {
+    private class FakeQueueStatePort(
+        private val clock: Clock,
+    ) : QueueStatePort {
         private val waiting = mutableMapOf<Long, MutableList<Long>>()
         private val admissionsByMember = mutableMapOf<Pair<Long, Long>, AdmissionRecord>()
         private val admissionTokens = mutableMapOf<String, AdmissionTokenRecord>()
+        private val tokenExpiresAt = mutableMapOf<String, Instant>()
+        private val occupancy = mutableMapOf<Long, MutableMap<Long, Instant>>()
 
         override fun addWaitingMember(
             performanceId: Long,
@@ -157,13 +217,48 @@ class QueueServiceTest {
         ) {
             admissionsByMember[performanceId to memberId] = AdmissionRecord(admissionToken, expiresAt)
             admissionTokens[admissionToken] = AdmissionTokenRecord(admissionToken, performanceId, memberId)
+            tokenExpiresAt[admissionToken] = expiresAt
+            occupancy.getOrPut(performanceId) { mutableMapOf() }[memberId] = expiresAt
         }
 
         override fun findAdmissionByMember(
             performanceId: Long,
             memberId: Long,
-        ): AdmissionRecord? = admissionsByMember[performanceId to memberId]
+        ): AdmissionRecord? {
+            val record = admissionsByMember[performanceId to memberId] ?: return null
+            if (isExpired(record.expiresAt)) {
+                admissionsByMember.remove(performanceId to memberId)
+                return null
+            }
+            return record
+        }
 
-        override fun loadAdmissionToken(admissionToken: String): AdmissionTokenRecord? = admissionTokens[admissionToken]
+        override fun loadAdmissionToken(admissionToken: String): AdmissionTokenRecord? {
+            val expiresAt = tokenExpiresAt[admissionToken] ?: return null
+            if (isExpired(expiresAt)) {
+                admissionTokens.remove(admissionToken)
+                tokenExpiresAt.remove(admissionToken)
+                return null
+            }
+            return admissionTokens[admissionToken]
+        }
+
+        override fun countOccupancy(
+            performanceId: Long,
+            now: Instant,
+        ): Long {
+            val members = occupancy[performanceId] ?: return 0
+            members.entries.removeAll { !it.value.isAfter(now) }
+            return members.size.toLong()
+        }
+
+        override fun release(
+            performanceId: Long,
+            memberId: Long,
+        ) {
+            occupancy[performanceId]?.remove(memberId)
+        }
+
+        private fun isExpired(expiresAt: Instant): Boolean = !expiresAt.isAfter(clock.instant())
     }
 }

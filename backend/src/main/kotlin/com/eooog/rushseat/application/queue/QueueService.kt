@@ -3,6 +3,8 @@ package com.eooog.rushseat.application.queue
 import com.eooog.rushseat.application.queue.provided.AdmitQueueUseCase
 import com.eooog.rushseat.application.queue.provided.EnterQueueUseCase
 import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
+import com.eooog.rushseat.application.queue.provided.LeaveQueueUseCase
+import com.eooog.rushseat.application.queue.provided.RefillAdmissionsUseCase
 import com.eooog.rushseat.application.queue.provided.ValidateAdmissionUseCase
 import com.eooog.rushseat.application.queue.required.QueueStatePort
 import org.springframework.beans.factory.annotation.Value
@@ -21,7 +23,9 @@ class QueueService(
 ) : EnterQueueUseCase,
     GetQueueStatusUseCase,
     AdmitQueueUseCase,
-    ValidateAdmissionUseCase {
+    ValidateAdmissionUseCase,
+    LeaveQueueUseCase,
+    RefillAdmissionsUseCase {
     private val admissionTokenTtl = Duration.ofSeconds(admissionTokenTtlSeconds)
 
     override fun enter(command: EnterQueueCommand): QueueEnterResult {
@@ -115,6 +119,32 @@ class QueueService(
             memberId = token.memberId,
             admissionToken = token.token,
         )
+    }
+
+    override fun leave(command: LeaveQueueCommand) {
+        queueStatePort.release(
+            performanceId = command.performanceId,
+            memberId = command.memberId,
+        )
+    }
+
+    override fun refill(command: RefillAdmissionsCommand): RefillAdmissionsResult {
+        val occupied = queueStatePort.countOccupancy(command.performanceId, clock.instant())
+        val room = (command.targetCapacity - occupied).coerceAtLeast(0)
+        if (room == 0L) {
+            return RefillAdmissionsResult(admittedCount = 0)
+        }
+
+        val result =
+            admit(
+                AdmitQueueCommand(
+                    performanceId = command.performanceId,
+                    limit = room.toInt(),
+                    requestedAt = command.requestedAt,
+                ),
+            )
+
+        return RefillAdmissionsResult(admittedCount = result.admittedCount)
     }
 
     private fun estimateWaitSeconds(rank: Long?): Long? {

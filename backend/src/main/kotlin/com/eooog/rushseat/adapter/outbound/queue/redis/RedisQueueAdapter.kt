@@ -58,6 +58,8 @@ class RedisQueueAdapter(
             stringConn.hSet(memberKey, "expiresAt", expiresAt.toString())
             stringConn.expire(memberKey, ttl.seconds)
 
+            stringConn.zAdd(occupancyKey(performanceId), expiresAt.toEpochMilli().toDouble(), memberId.toString())
+
             null
         }
     }
@@ -86,12 +88,30 @@ class RedisQueueAdapter(
         )
     }
 
+    override fun countOccupancy(
+        performanceId: Long,
+        now: Instant,
+    ): Long {
+        val key = occupancyKey(performanceId)
+        redis.opsForZSet().removeRangeByScore(key, Double.NEGATIVE_INFINITY, now.toEpochMilli().toDouble())
+        return redis.opsForZSet().size(key) ?: 0L
+    }
+
+    override fun release(
+        performanceId: Long,
+        memberId: Long,
+    ) {
+        redis.opsForZSet().remove(occupancyKey(performanceId), memberId.toString())
+    }
+
     private fun waitingKey(performanceId: Long): String = "queue:waiting:$performanceId"
 
     private fun admissionByMemberKey(
         performanceId: Long,
         memberId: Long,
     ): String = "admission:member:$performanceId:$memberId"
+
+    private fun occupancyKey(performanceId: Long): String = "admission:occupancy:$performanceId"
 
     private fun sequenceKey(performanceId: Long): String = "queue:seq:$performanceId"
 

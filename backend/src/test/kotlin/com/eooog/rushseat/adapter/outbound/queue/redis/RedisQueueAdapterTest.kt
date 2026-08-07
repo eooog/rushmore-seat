@@ -108,6 +108,52 @@ class RedisQueueAdapterTest {
         }
     }
 
+    @Test
+    fun `admit() should add the member to occupancy while the admission is still valid`() {
+        val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
+
+        adapter.admit(
+            performanceId = performanceId,
+            memberId = memberId,
+            admissionToken = "at_abc",
+            expiresAt = expiresAt,
+            ttl = Duration.ofMinutes(3),
+        )
+
+        assertThat(adapter.countOccupancy(performanceId, expiresAt.minusSeconds(1))).isEqualTo(1L)
+    }
+
+    @Test
+    fun `countOccupancy() should exclude admissions that have expired by the given instant`() {
+        val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
+
+        adapter.admit(
+            performanceId = performanceId,
+            memberId = memberId,
+            admissionToken = "at_abc",
+            expiresAt = expiresAt,
+            ttl = Duration.ofMinutes(3),
+        )
+
+        assertThat(adapter.countOccupancy(performanceId, expiresAt.plusSeconds(1))).isEqualTo(0L)
+    }
+
+    @Test
+    fun `release() should remove the member from occupancy`() {
+        val expiresAt = Instant.parse("2026-01-01T00:03:00Z")
+
+        adapter.admit(
+            performanceId = performanceId,
+            memberId = memberId,
+            admissionToken = "at_abc",
+            expiresAt = expiresAt,
+            ttl = Duration.ofMinutes(3),
+        )
+        adapter.release(performanceId, memberId)
+
+        assertThat(adapter.countOccupancy(performanceId, expiresAt.minusSeconds(1))).isEqualTo(0L)
+    }
+
     private fun flushRedis() {
         redisTemplate.execute { connection ->
             connection.serverCommands().flushDb()

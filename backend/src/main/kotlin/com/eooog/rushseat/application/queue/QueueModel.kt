@@ -58,3 +58,18 @@ data class AdmittedMember(
     val memberId: Long,
     val admissionToken: String,
 )
+
+data class LeaveQueueCommand(
+    val performanceId: Long,
+    val memberId: Long,
+)
+
+data class RefillAdmissionsCommand(
+    val performanceId: Long,
+    val targetCapacity: Int,
+    val requestedAt: Instant,
+)
+
+data class RefillAdmissionsResult(
+    val admittedCount: Int,
+)
