@@ -15,6 +15,12 @@ import org.springframework.web.filter.OncePerRequestFilter
 class AccessTokenAuthenticationFilter(
     private val accessTokenVerifier: AccessTokenVerifier,
 ) : OncePerRequestFilter() {
+    // SSE 등 async dispatch를 쓰는 엔드포인트에서는 Spring Security의 AuthorizationFilter가
+    // async 재디스패치 시점에도 다시 실행된다(OncePerRequestFilter 기반이 아니라서). 이 필터가
+    // 기본값(true)을 그대로 두면 async 재디스패치에서 스킵되어 SecurityContext가 비고,
+    // 뒤이어 도는 AuthorizationFilter가 그걸 미인증으로 보고 거부한다.
+    override fun shouldNotFilterAsyncDispatch(): Boolean = false
+
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
