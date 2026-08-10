@@ -4,6 +4,7 @@ import com.eooog.rushseat.application.performance.required.LoadPerformanceSalesS
 import com.eooog.rushseat.application.performance.required.PerformanceSalesStatusSnapshot
 import com.eooog.rushseat.application.queue.required.AdmissionRecord
 import com.eooog.rushseat.application.queue.required.AdmissionTokenRecord
+import com.eooog.rushseat.application.queue.required.QueueEventPort
 import com.eooog.rushseat.application.queue.required.QueueStatePort
 import com.eooog.rushseat.domain.performance.PerformanceSalesStatus
 import com.eooog.rushseat.domain.performance.PerformanceStatus
@@ -21,6 +22,7 @@ import java.time.Instant
 class QueueServiceTest {
     private lateinit var queueStatePort: FakeQueueStatePort
     private lateinit var loadPerformanceSalesStatusPort: FakeLoadPerformanceSalesStatusPort
+    private lateinit var queueEventPort: FakeQueueEventPort
     private lateinit var clock: TestClock
     private lateinit var queueService: QueueService
 
@@ -37,7 +39,9 @@ class QueueServiceTest {
             FakeLoadPerformanceSalesStatusPort().apply {
                 setSalesStatus(performanceId, PerformanceStatus.SCHEDULED, PerformanceSalesStatus.ON_SALE)
             }
-        queueService = QueueService(queueStatePort, loadPerformanceSalesStatusPort, clock, admissionTokenTtlSeconds)
+        queueEventPort = FakeQueueEventPort()
+        queueService =
+            QueueService(queueStatePort, loadPerformanceSalesStatusPort, queueEventPort, clock, admissionTokenTtlSeconds)
     }
 
     @Test
@@ -143,6 +147,29 @@ class QueueServiceTest {
 
         assertThat(result.admittedCount).isEqualTo(2)
         assertThat(result.admissions.map { it.memberId }).containsExactly(memberId, otherMemberId)
+    }
+
+    @Test
+    fun `admit() should notify each admitted member and broadcast progress once`() {
+        queueService.enter(enterCommand(memberId))
+        queueService.enter(enterCommand(otherMemberId))
+
+        val result = queueService.admit(admitCommand(limit = 10))
+
+        assertThat(queueEventPort.notifiedAdmissions.map { it.memberId }).containsExactly(memberId, otherMemberId)
+        assertThat(queueEventPort.notifiedAdmissions.map { it.admissionToken })
+            .isEqualTo(result.admissions.map { it.admissionToken })
+        assertThat(queueEventPort.broadcasts)
+            .containsExactly(FakeQueueEventPort.BroadcastProgress(performanceId, 2))
+    }
+
+    @Test
+    fun `admit() should not notify or broadcast when nobody is admitted`() {
+        val result = queueService.admit(admitCommand(limit = 10))
+
+        assertThat(result.admittedCount).isEqualTo(0)
+        assertThat(queueEventPort.notifiedAdmissions).isEmpty()
+        assertThat(queueEventPort.broadcasts).isEmpty()
     }
 
     @Test
@@ -324,5 +351,38 @@ class QueueServiceTest {
         }
 
         override fun load(performanceId: Long): PerformanceSalesStatusSnapshot? = snapshots[performanceId]
+    }
+
+    private class FakeQueueEventPort : QueueEventPort {
+        val notifiedAdmissions = mutableListOf<NotifiedAdmission>()
+        val broadcasts = mutableListOf<BroadcastProgress>()
+
+        override fun broadcastProgress(
+            performanceId: Long,
+            admittedCount: Int,
+        ) {
+            broadcasts += BroadcastProgress(performanceId, admittedCount)
+        }
+
+        override fun notifyAdmitted(
+            performanceId: Long,
+            memberId: Long,
+            admissionToken: String,
+            expiresAt: Instant,
+        ) {
+            notifiedAdmissions += NotifiedAdmission(performanceId, memberId, admissionToken, expiresAt)
+        }
+
+        data class BroadcastProgress(
+            val performanceId: Long,
+            val admittedCount: Int,
+        )
+
+        data class NotifiedAdmission(
+            val performanceId: Long,
+            val memberId: Long,
+            val admissionToken: String,
+            val expiresAt: Instant,
+        )
     }
 }

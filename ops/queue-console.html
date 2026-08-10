@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rush Seat / Queue Console</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 760px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 1.25rem;
+  }
+  fieldset {
+    margin-bottom: 1rem;
+    border-radius: 8px;
+  }
+  label {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-right: 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+  }
+  input {
+    padding: 0.35rem 0.5rem;
+    min-width: 10rem;
+  }
+  button {
+    padding: 0.4rem 0.8rem;
+    margin: 0.15rem;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  #status {
+    font-weight: bold;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: color-mix(in srgb, canvastext 8%, transparent);
+    margin-bottom: 1rem;
+  }
+  #log {
+    background: color-mix(in srgb, canvastext 5%, transparent);
+    padding: 0.75rem;
+    border-radius: 6px;
+    height: 260px;
+    overflow-y: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+  <h1>Queue Console — enter → stream(SSE) → goal → leave</h1>
+
+  <fieldset>
+    <legend>연결 설정</legend>
+    <label>Base URL <input id="baseUrl" value="http://localhost:8080" /></label>
+    <label>Performance ID <input id="performanceId" value="1" /></label>
+    <label>Member ID <input id="memberId" value="1" /></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>동작</legend>
+    <button id="btnLogin">1. 로그인 (mock)</button>
+    <button id="btnEnter" disabled>2. enter()</button>
+    <button id="btnMe" disabled>3. me() (최초 등수)</button>
+    <button id="btnStream" disabled>4. stream 연결 (SSE)</button>
+    <button id="btnDisconnect" disabled>stream 연결 해제</button>
+    <button id="btnGoal" disabled>5. goal()</button>
+    <button id="btnLeave" disabled>6. leave()</button>
+    <button id="btnReset">초기화</button>
+  </fieldset>
+
+  <div id="status">대기 중</div>
+  <div id="log"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    accessToken: null,
+    rank: null,
+    admissionToken: null,
+    streamAbortController: null,
+  };
+
+  function log(message) {
+    const line = `[${new Date().toISOString().slice(11, 19)}] ${message}`;
+    const el = $("log");
+    el.textContent += line + "\n";
+    el.scrollTop = el.scrollHeight;
+    console.log(line);
+  }
+
+  function setStatus(text) {
+    $("status").textContent = text;
+  }
+
+  function baseUrl() {
+    return $("baseUrl").value.replace(/\/$/, "");
+  }
+
+  function performanceId() {
+    return $("performanceId").value;
+  }
+
+  function authHeaders() {
+    return { Authorization: `Bearer ${state.accessToken}` };
+  }
+
+  async function login() {
+    const memberId = Number($("memberId").value);
+    const res = await fetch(`${baseUrl()}/internal/auth/access-tokens`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId }),
+    });
+    if (!res.ok) throw new Error(`login failed: ${res.status}`);
+    const body = await res.json();
+    state.accessToken = body.accessToken;
+    log(`로그인 성공, memberId=${memberId}`);
+    setStatus("로그인됨 — enter() 대기");
+    $("btnEnter").disabled = false;
+  }
+
+  async function enter() {
+    const res = await fetch(`${baseUrl()}/performances/${performanceId()}/queue`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`enter() failed: ${res.status}`);
+    const body = await res.json();
+    log(`enter() 성공: status=${body.status}, joinedAt=${body.joinedAt}`);
+    setStatus("대기열 진입 완료 — me() 로 최초 등수 확인");
+    $("btnMe").disabled = false;
+  }
+
+  async function me() {
+    const res = await fetch(`${baseUrl()}/performances/${performanceId()}/queue/me`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`me() failed: ${res.status}`);
+    const body = await res.json();
+    if (body.status === "ADMITTED") {
+      onAdmitted(body.admissionToken, body.expiresAt);
+      return;
+    }
+    state.rank = body.rank;
+    log(`me(): status=${body.status}, rank=${body.rank}`);
+    setStatus(`대기 중 — 등수 ${body.rank}`);
+    $("btnStream").disabled = false;
+  }
+
+  // 브라우저 EventSource는 커스텀 헤더(Authorization)를 못 보내므로,
+  // fetch()의 streaming body를 직접 읽어 SSE 프레임을 파싱한다.
+  async function connectStream() {
+    const controller = new AbortController();
+    state.streamAbortController = controller;
+
+    $("btnStream").disabled = true;
+    $("btnDisconnect").disabled = false;
+    setStatus(`스트림 연결 중 — 등수 ${state.rank}`);
+
+    let response;
+    try {
+      response = await fetch(`${baseUrl()}/performances/${performanceId()}/queue/stream`, {
+        headers: authHeaders(),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        log("stream: 연결 해제됨");
+        return;
+      }
+      throw err;
+    }
+
+    if (!response.ok || !response.body) {
+      throw new Error(`stream 연결 실패: ${response.status}`);
+    }
+    log("stream: 연결됨");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let separatorIndex;
+        while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+          const rawFrame = buffer.slice(0, separatorIndex);
+          buffer = buffer.slice(separatorIndex + 2);
+          const frame = parseSseFrame(rawFrame);
+          if (frame) handleStreamEvent(frame);
+        }
+      }
+      log("stream: 서버가 연결을 종료함");
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        log(`stream: 오류 - ${err.message}`);
+      }
+    }
+  }
+
+  function parseSseFrame(rawFrame) {
+    let eventName = "message";
+    const dataLines = [];
+    for (const line of rawFrame.split("\n")) {
+      if (line.startsWith("event:")) eventName = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return null;
+    return { event: eventName, data: dataLines.join("\n") };
+  }
+
+  function handleStreamEvent(frame) {
+    const payload = JSON.parse(frame.data);
+
+    if (frame.event === "progress") {
+      // admit()이 항상 대기열 맨 앞부터 pop하는 FIFO이므로,
+      // 로컬에서 등수를 그만큼 빼는 게 서버 재계산과 수학적으로 동일하다.
+      if (state.rank != null) {
+        state.rank = Math.max(0, state.rank - payload.admitted);
+      }
+      log(`progress: admitted=${payload.admitted} → 내 예상 등수 ${state.rank}`);
+      setStatus(`대기 중 — 예상 등수 ${state.rank}`);
+      return;
+    }
+
+    if (frame.event === "admitted") {
+      onAdmitted(payload.admissionToken, payload.expiresAt);
+      // 서버가 이 admitted 이벤트를 보낸 직후 연결을 close하지만,
+      // 클라이언트 쪽도 명시적으로 정리한다.
+      disconnectStream();
+      return;
+    }
+
+    log(`stream: 알 수 없는 이벤트 "${frame.event}" - ${frame.data}`);
+  }
+
+  function onAdmitted(admissionToken, expiresAt) {
+    state.admissionToken = admissionToken;
+    log(`ADMITTED! admissionToken=${admissionToken}, expiresAt=${expiresAt}`);
+    setStatus("입장 허가됨 — goal() 호출 가능");
+    $("btnGoal").disabled = false;
+  }
+
+  function disconnectStream() {
+    if (state.streamAbortController) {
+      state.streamAbortController.abort();
+      state.streamAbortController = null;
+    }
+    $("btnStream").disabled = false;
+    $("btnDisconnect").disabled = true;
+  }
+
+  async function goal() {
+    const res = await fetch(`${baseUrl()}/performances/${performanceId()}/queue/goal`, {
+      method: "POST",
+      headers: { ...authHeaders(), "X-Admission-Token": state.admissionToken },
+    });
+    if (!res.ok) throw new Error(`goal() failed: ${res.status}`);
+    const body = await res.json();
+    log(`goal() 성공: ${JSON.stringify(body)}`);
+    setStatus("goal() 통과 — leave() 로 점유 반납 가능");
+    $("btnLeave").disabled = false;
+  }
+
+  async function leave() {
+    const res = await fetch(`${baseUrl()}/performances/${performanceId()}/queue/leave`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`leave() failed: ${res.status}`);
+    log("leave() 성공 — occupancy 반납됨");
+    setStatus("완료");
+  }
+
+  function reset() {
+    disconnectStream();
+    state.accessToken = null;
+    state.rank = null;
+    state.admissionToken = null;
+    $("log").textContent = "";
+    setStatus("대기 중");
+    for (const id of ["btnEnter", "btnMe", "btnStream", "btnGoal", "btnLeave"]) {
+      $(id).disabled = true;
+    }
+    $("btnDisconnect").disabled = true;
+  }
+
+  function wire(id, handler) {
+    $(id).addEventListener("click", () => {
+      handler().catch((err) => {
+        log(`오류: ${err.message}`);
+        setStatus(`오류: ${err.message}`);
+      });
+    });
+  }
+
+  wire("btnLogin", login);
+  wire("btnEnter", enter);
+  wire("btnMe", me);
+  wire("btnStream", connectStream);
+  wire("btnGoal", goal);
+  wire("btnLeave", leave);
+  $("btnDisconnect").addEventListener("click", disconnectStream);
+  $("btnReset").addEventListener("click", reset);
+</script>
+</body>
+</html>

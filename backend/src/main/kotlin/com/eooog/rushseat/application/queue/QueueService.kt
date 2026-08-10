@@ -7,6 +7,7 @@ import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
 import com.eooog.rushseat.application.queue.provided.LeaveQueueUseCase
 import com.eooog.rushseat.application.queue.provided.RefillAdmissionsUseCase
 import com.eooog.rushseat.application.queue.provided.ValidateAdmissionUseCase
+import com.eooog.rushseat.application.queue.required.QueueEventPort
 import com.eooog.rushseat.application.queue.required.QueueStatePort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -20,6 +21,7 @@ import java.util.UUID
 class QueueService(
     private val queueStatePort: QueueStatePort,
     private val loadPerformanceSalesStatusPort: LoadPerformanceSalesStatusPort,
+    private val queueEventPort: QueueEventPort,
     private val clock: Clock,
     @Value("\${rushmore-seat.queue.admission-token-ttl-seconds}") admissionTokenTtlSeconds: Long,
 ) : EnterQueueUseCase,
@@ -98,6 +100,18 @@ class QueueService(
                     admissionToken = admissionToken,
                     expiresAt = expiresAt,
                 )
+        }
+
+        admissions.forEach {
+            queueEventPort.notifyAdmitted(
+                performanceId = command.performanceId,
+                memberId = it.memberId,
+                admissionToken = it.admissionToken,
+                expiresAt = it.expiresAt,
+            )
+        }
+        if (admissions.isNotEmpty()) {
+            queueEventPort.broadcastProgress(command.performanceId, admissions.size)
         }
 
         return AdmitQueueResult(

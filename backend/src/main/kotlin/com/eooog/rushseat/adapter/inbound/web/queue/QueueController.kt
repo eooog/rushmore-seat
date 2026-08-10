@@ -1,5 +1,6 @@
 package com.eooog.rushseat.adapter.inbound.web.queue
 
+import com.eooog.rushseat.adapter.outbound.realtime.sse.SseQueueEventPublisher
 import com.eooog.rushseat.application.queue.AdmitQueueCommand
 import com.eooog.rushseat.application.queue.AdmitQueueResult
 import com.eooog.rushseat.application.queue.AdmittedMember
@@ -15,6 +16,7 @@ import com.eooog.rushseat.application.queue.provided.GetQueueStatusUseCase
 import com.eooog.rushseat.application.queue.provided.LeaveQueueUseCase
 import com.eooog.rushseat.application.queue.provided.ValidateAdmissionUseCase
 import com.eooog.rushseat.application.shared.auth.MemberPrincipal
+import org.springframework.http.MediaType
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.time.Instant
 
 @RestController
@@ -31,6 +34,7 @@ class QueueController(
     private val admitQueueUseCase: AdmitQueueUseCase,
     private val leaveQueueUseCase: LeaveQueueUseCase,
     private val validateAdmissionUseCase: ValidateAdmissionUseCase,
+    private val sseQueueEventPublisher: SseQueueEventPublisher,
 ) {
     @PostMapping("/performances/{performanceId}/queue")
     fun enter(
@@ -68,6 +72,12 @@ class QueueController(
             ),
         )
     }
+
+    @GetMapping("/performances/{performanceId}/queue/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun stream(
+        @PathVariable performanceId: Long,
+        @AuthenticationPrincipal principal: MemberPrincipal,
+    ): SseEmitter = sseQueueEventPublisher.register(performanceId, principal.memberId)
 
     @PostMapping("/performances/{performanceId}/queue/goal")
     fun goal(

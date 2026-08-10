@@ -1,5 +1,6 @@
 package com.eooog.rushseat.adapter.inbound.web.queue
 
+import com.eooog.rushseat.adapter.outbound.realtime.sse.SseQueueEventPublisher
 import com.eooog.rushseat.application.queue.AdmitQueueCommand
 import com.eooog.rushseat.application.queue.AdmitQueueResult
 import com.eooog.rushseat.application.queue.AdmittedMember
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
+import org.springframework.mock.web.MockAsyncContext
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver
@@ -32,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.server.ResponseStatusException
@@ -43,6 +46,7 @@ class QueueControllerTest {
     private val admitQueueUseCase = FakeAdmitQueueUseCase()
     private val leaveQueueUseCase = FakeLeaveQueueUseCase()
     private val validateAdmissionUseCase = FakeValidateAdmissionUseCase()
+    private val sseQueueEventPublisher = SseQueueEventPublisher()
 
     private val objectMapper =
         ObjectMapper()
@@ -58,6 +62,7 @@ class QueueControllerTest {
                     admitQueueUseCase,
                     leaveQueueUseCase,
                     validateAdmissionUseCase,
+                    sseQueueEventPublisher,
                 ),
             ).setCustomArgumentResolvers(AuthenticationPrincipalArgumentResolver())
             .setMessageConverters(MappingJackson2HttpMessageConverter(objectMapper))
@@ -121,6 +126,49 @@ class QueueControllerTest {
 
         assertThat(leaveQueueUseCase.lastCommand)
             .isEqualTo(LeaveQueueCommand(performanceId = performanceId, memberId = memberId))
+    }
+
+    @Test
+    fun `stream() should register an SSE connection for the authenticated principal`() {
+        mockMvc
+            .perform(get("/performances/{performanceId}/queue/stream", performanceId))
+            .andExpect(request().asyncStarted())
+
+        assertThat(sseQueueEventPublisher.connectionCount(performanceId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `stream() connection should be cleaned up when the client disconnects`() {
+        val mvcResult =
+            mockMvc
+                .perform(get("/performances/{performanceId}/queue/stream", performanceId))
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+        assertThat(sseQueueEventPublisher.connectionCount(performanceId)).isEqualTo(1)
+
+        (mvcResult.request.asyncContext as MockAsyncContext).complete()
+
+        assertThat(sseQueueEventPublisher.connectionCount(performanceId)).isEqualTo(0)
+    }
+
+    @Test
+    fun `a stale disconnect should not evict a newer connection registered for the same member`() {
+        val staleResult =
+            mockMvc
+                .perform(get("/performances/{performanceId}/queue/stream", performanceId))
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+        mockMvc
+            .perform(get("/performances/{performanceId}/queue/stream", performanceId))
+            .andExpect(request().asyncStarted())
+
+        assertThat(sseQueueEventPublisher.connectionCount(performanceId)).isEqualTo(1)
+
+        (staleResult.request.asyncContext as MockAsyncContext).complete()
+
+        assertThat(sseQueueEventPublisher.connectionCount(performanceId)).isEqualTo(1)
     }
 
     @Test
