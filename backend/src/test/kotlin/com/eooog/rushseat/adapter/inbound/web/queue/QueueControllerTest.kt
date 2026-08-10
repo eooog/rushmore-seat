@@ -138,6 +138,22 @@ class QueueControllerTest {
     }
 
     @Test
+    fun `stream() should flush a comment immediately so the connection doesn't look hung on a quiet queue`() {
+        val mvcResult =
+            mockMvc
+                .perform(get("/performances/{performanceId}/queue/stream", performanceId))
+                .andExpect(request().asyncStarted())
+                .andReturn()
+
+        // Spring/Tomcat buffer the response and don't commit headers until the first write, so
+        // without an eager flush a client connecting to a queue with no imminent admit() gets no
+        // bytes at all - not even headers - until something happens to be broadcast. That reads
+        // as a hung/failed connection on the client, which is exactly what forced the fallback to
+        // polling. register() sends an SSE comment immediately to force the flush.
+        assertThat(mvcResult.response.contentAsString).isEqualTo(":connected\n\n")
+    }
+
+    @Test
     fun `stream() connection should be cleaned up when the client disconnects`() {
         val mvcResult =
             mockMvc

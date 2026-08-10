@@ -22,6 +22,16 @@ class SseQueueEventPublisher : QueueEventPort {
         emitter.onTimeout(cleanup)
         emitter.onError { cleanup() }
 
+        // Spring/Tomcat buffer the response and don't flush headers until the first write, so a
+        // client connecting to a quiet queue (no admits yet) gets no bytes at all — not even
+        // headers — until something is actually broadcast. That looks like a hung/failed
+        // connection to the client. Sending an SSE comment immediately forces the headers to
+        // commit right away; ResponseBodyEmitter explicitly supports sending before the
+        // container has called initialize() by queueing into earlySendAttempts.
+        runCatching {
+            emitter.send(SseEmitter.event().comment("connected"))
+        }
+
         return emitter
     }
 
